@@ -127,7 +127,7 @@ export class MetaApiService {
             // Fetch Account Level for accurate Reach/Unique metrics
             const accountParams = { ...params, level: 'account', fields: 'spend,impressions,clicks,cpc,ctr,cpm,reach,frequency,unique_ctr,inline_link_clicks,unique_inline_link_click_ctr,actions' }
             delete accountParams.limit
-            delete accountParams.level
+
             accountParams.breakdowns = undefined // Ensure no breakdowns
 
             const accountData = await this.fetch('insights', accountParams)
