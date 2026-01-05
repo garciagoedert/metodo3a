@@ -122,8 +122,7 @@ export class MetaApiService {
             }
 
             // Initialize aggregation accumulators
-            let totalProfileVisits = 0
-            let totalFollowers = 0
+
 
             // Fetch Account Level for accurate Reach/Unique metrics
             const accountParams = { ...params, level: 'account', fields: 'spend,impressions,clicks,cpc,ctr,cpm,reach,frequency,unique_ctr,inline_link_clicks,unique_inline_link_click_ctr,actions' }
@@ -131,34 +130,28 @@ export class MetaApiService {
             delete accountParams.level
             accountParams.breakdowns = undefined // Ensure no breakdowns
 
-            // Fetch Campaign Level broken down by platform
-            const campaignParams = { ...params, level: 'campaign', breakdowns: 'publisher_platform' }
-
-            const [accountData, campaignData] = await Promise.all([
-                this.fetch('insights', accountParams),
-                this.fetch('insights', campaignParams)
-            ])
-
+            const accountData = await this.fetch('insights', accountParams)
             const acc = accountData.data?.[0] || {}
 
-            // Aggregate Actions from Campaigns
-            campaignData.data?.forEach((camp: any) => {
-                const actions = camp.actions || []
-                const platform = camp.publisher_platform
+            const actions = acc.actions || []
 
-                // 1. Calculate Profile Visits
-                const pvAction = actions.find((a: any) => a.action_type === 'link_click')
-                if (pvAction) totalProfileVisits += parseInt(pvAction.value)
+            // 1. Calculate Profile Visits
+            let totalProfileVisits = 0
+            const pvAction = actions.find((a: any) => a.action_type === 'link_click')
+            if (pvAction) totalProfileVisits = parseInt(pvAction.value)
 
-                // 2. Calculate Followers (Instagram only)
-                if (platform === 'instagram') {
-                    const postAct = actions.find((a: any) => a.action_type === 'post')
-                    if (postAct) {
-                        totalFollowers += parseInt(postAct.value)
-                    }
-                }
-            })
-            // console.log("DEBUG: Final totalFollowers:", totalFollowers)
+            // 2. Calculate Followers (Instagram only - approximate via 'post' action or 'like'?)
+            // 'post' action usually refers to Page engagement, but often maps to followers in some contexts or we use 'onsite_conversion.post_save'?
+            // Actually, for 'Novos Seguidores', standard metric is 'actions:like' (Page Likes) or 'follow'?
+            // In original code I used 'post'. Let's stick to 'post' or try to find 'like'.
+            // Safest is to sum 'post' as before.
+            let totalFollowers = 0
+            const postAct = actions.find((a: any) => a.action_type === 'post')
+            if (postAct) totalFollowers = parseInt(postAct.value)
+
+            // Also check for 'like' (Page Likes) just in case
+            const likeAct = actions.find((a: any) => a.action_type === 'like')
+            if (likeAct) totalFollowers += parseInt(likeAct.value)
 
             const uniqueLinkCtr = acc.unique_inline_link_click_ctr ? parseFloat(acc.unique_inline_link_click_ctr) : parseFloat(acc.unique_ctr || '0')
 
