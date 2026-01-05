@@ -102,7 +102,7 @@ export class MetaApiService {
 
     async getAccountInsights(dateRange?: { since: string, until: string }): Promise<MetaInsights> {
         const params: any = {
-            fields: 'spend,impressions,clicks,cpc,ctr,cpm,reach,frequency,unique_ctr,inline_link_clicks,unique_inline_link_click_ctr,outbound_clicks,actions,cost_per_action_type,objective,campaign_name,ad_name',
+            fields: 'spend,impressions,clicks,cpc,ctr,cpm,reach,frequency,unique_ctr,inline_link_clicks,unique_inline_link_click_ctr,outbound_clicks,actions,objective,campaign_name',
             level: 'campaign', // Revert to campaign level as used in CSV
             action_attribution_windows: '["1d_click","7d_click","1d_view"]', // Request specific windows
             limit: 500
