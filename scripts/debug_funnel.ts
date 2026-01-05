@@ -8,7 +8,7 @@ const path = require('path')
 try {
     const envPath = path.resolve(process.cwd(), '.env.local')
     const envFile = fs.readFileSync(envPath, 'utf8')
-    envFile.split('\n').forEach(line => {
+    envFile.split('\n').forEach((line: string) => {
         const [key, ...values] = line.split('=')
         if (key && values.length > 0) {
             const val = values.join('=').trim().replace(/^["']|["']$/g, '')
@@ -67,7 +67,7 @@ async function run() {
 
     console.log("Found Rows:", metricsList?.length)
     if (metricsList) {
-        metricsList.forEach(m => console.log(` - ${m.month_start}: Sched=${m.appointments_scheduled}, Show=${m.appointments_showed}`))
+        metricsList.forEach((m: any) => console.log(` - ${m.month_start}: Sched=${m.appointments_scheduled}, Show=${m.appointments_showed}`))
     } else {
         console.log("No metrics list found.")
     }
