@@ -127,7 +127,7 @@ export function DashboardInteractiveBoard({ insights, daily, distribution, topCr
 
     const conversasValue = insights?.actions
         ? insights.actions
-            .filter((a: any) => a.action_type === 'onsite_conversion.messaging_conversation_started_7d')
+            .filter((a: any) => a.action_type.startsWith('onsite_conversion.messaging_conversation_started'))
             .reduce((a: any, b: any) => a + parseInt(b.value), 0)
         : 0
 

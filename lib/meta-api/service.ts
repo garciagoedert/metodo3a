@@ -378,9 +378,8 @@ export class MetaApiService {
                 ? parseInt(actions.find((a: any) => a.action_type === 'post').value)
                 : 0
 
-            const conversations = actions.find((a: any) => a.action_type === 'onsite_conversion.messaging_conversation_started_7d')
-                ? parseInt(actions.find((a: any) => a.action_type === 'onsite_conversion.messaging_conversation_started_7d').value)
-                : 0
+            const conversations = actions.filter((a: any) => a.action_type.startsWith('onsite_conversion.messaging_conversation_started'))
+                .reduce((acc: number, item: any) => acc + parseInt(item.value), 0)
 
             return {
                 date: item.date_start,
@@ -539,7 +538,8 @@ export class MetaApiService {
 
                 const actions = insight.actions || []
                 const profileVisits = actions.find((a: any) => a.action_type === 'instagram_profile_visits')?.value || '0'
-                const conversations = actions.find((a: any) => a.action_type === 'onsite_conversion.messaging_conversation_started_7d')?.value || '0'
+                const conversations = actions.filter((a: any) => a.action_type.startsWith('onsite_conversion.messaging_conversation_started'))
+                    .reduce((acc: number, item: any) => acc + parseInt(item.value), 0)
 
                 return {
                     id: insight.ad_id,
@@ -612,7 +612,8 @@ export class MetaApiService {
             .map((d: any) => {
                 const actions = d.actions || []
                 const profileVisits = actions.find((a: any) => a.action_type === 'instagram_profile_visits')?.value || '0'
-                const conversations = actions.find((a: any) => a.action_type === 'onsite_conversion.messaging_conversation_started_7d')?.value || '0'
+                const conversations = actions.filter((a: any) => a.action_type.startsWith('onsite_conversion.messaging_conversation_started'))
+                    .reduce((acc: number, item: any) => acc + parseInt(item.value), 0)
                 return {
                     ad_account_id: this.dbId,
                     ad_id: d.ad_id,
