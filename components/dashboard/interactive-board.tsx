@@ -308,7 +308,7 @@ export function DashboardInteractiveBoard({ insights, daily, distribution, topCr
                     </div>
 
                     {/* Funnel Box */}
-                    <div className="bg-white dark:bg-slate-950 rounded-xl border shadow-sm p-4 h-full">
+                    <div className="bg-white dark:bg-slate-950 rounded-xl border shadow-sm p-4 max-h-[calc(100vh-8rem)] overflow-y-auto custom-scrollbar">
                         {resolvedFunnelSteps.length > 0 ? (
                             <FunnelSection
                                 steps={resolvedFunnelSteps}

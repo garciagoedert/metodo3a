@@ -80,7 +80,7 @@ export function FunnelSection({ steps, selectedMetrics = [], onMetricClick }: Fu
 
                             {/* Visual Connector Arrow (Centered in Spacer) */}
                             {index < steps.length - 1 && (
-                                <div className="w-full flex items-center justify-center relative z-20 py-3">
+                                <div className="w-full flex items-center justify-center relative z-20 py-2">
                                     <div
                                         className="flex items-center justify-center gap-1.5"
                                     >
