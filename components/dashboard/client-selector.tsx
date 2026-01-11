@@ -54,13 +54,13 @@ export function ClientSelector({ className, accounts, currentAccountId }: Client
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className={cn("w-full md:w-[250px] justify-between", className)}
+                    className={cn("w-full md:w-[400px] justify-between", className)}
                 >
                     <span className="truncate">{currentAccountName}</span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[250px] p-0">
+            <PopoverContent className="w-[400px] p-0">
                 <Command>
                     <CommandInput placeholder="Buscar cliente..." />
                     <CommandList>
