@@ -64,7 +64,7 @@ export function FunnelSection({ steps, selectedMetrics = [], onMetricClick }: Fu
 
                                 {/* Content - Absolute Centered (z-0) */}
                                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-16">
-                                    <span className="font-medium tracking-wide opacity-90 leading-tight mb-0.5 whitespace-nowrap" style={{ fontSize: 'container-label' }}>
+                                    <span className="font-medium tracking-wide opacity-90 leading-tight mb-0.5 whitespace-normal break-words w-full" style={{ fontSize: 'container-label' }}>
                                         {/* Fluid typography using clamp (min, val, max) logic via min(viewport_rel, pixel_limit) */}
                                         <span className="text-[min(3.5vw,13px)] sm:text-[min(2vw,14px)]">
                                             {step.label}
