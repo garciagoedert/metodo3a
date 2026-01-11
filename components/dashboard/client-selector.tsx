@@ -47,6 +47,19 @@ export function ClientSelector({ className, accounts, currentAccountId }: Client
 
     const currentAccountName = accounts.find(a => a.provider_account_id === currentAccountId)?.name || "Selecione o Cliente..."
 
+    // Sort accounts alphabetically ignoring "Dr." and "Dra."
+    const sortedAccounts = [...accounts].sort((a, b) => {
+        const cleanName = (name: string) => {
+            return name.toLowerCase()
+                .replace(/^dr\.\s*/, '')
+                .replace(/^dra\.\s*/, '')
+                .replace(/^dr\s+/, '')
+                .replace(/^dra\s+/, '')
+                .trim()
+        }
+        return cleanName(a.name).localeCompare(cleanName(b.name))
+    })
+
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
@@ -66,7 +79,7 @@ export function ClientSelector({ className, accounts, currentAccountId }: Client
                     <CommandList>
                         <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
                         <CommandGroup>
-                            {accounts.map((account) => (
+                            {sortedAccounts.map((account) => (
                                 <CommandItem
                                     key={account.provider_account_id}
                                     value={account.name} // Command searches by this value
