@@ -3,7 +3,7 @@ import { getDashboardData, getConnectedAccounts } from "./actions"
 
 import { MetricCard } from "@/components/dashboard/metric-card"
 import { DashboardInteractiveBoard } from "@/components/dashboard/interactive-board"
-import { DollarSign, MousePointer2, Users, Eye, MessageSquare, Tag } from "lucide-react"
+import { DollarSign, MousePointer2, Users, Eye, MessageSquare, Tag, ChevronLeft, ChevronRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Header } from "@/components/dashboard/header"
 import { FunnelSection } from "@/components/dashboard/funnel-section"
@@ -98,7 +98,8 @@ export default async function DashboardPage(props: {
   // Adapting to Dashboard Props (CPA needs this structure)
   const manualMetrics = {
     appointments_scheduled: funnelData.scheduled,
-    appointments_showed: funnelData.showed
+    appointments_showed: funnelData.showed,
+    new_followers: funnelData.followers // Mapped to 'followers' key in funnel object
   }
 
   return (
@@ -115,6 +116,7 @@ export default async function DashboardPage(props: {
           funnelData={funnelData}
           accountId={activeAccountId}
           monthStart={monthStart}
+          dateRange={dateRangeObj}
           dashboardConfig={dashboardConfig}
         />
       </main>

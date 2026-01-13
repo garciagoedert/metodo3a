@@ -2,8 +2,17 @@
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { headers } from "next/headers"
+import { DEMO_ACCOUNT_ID, DEMO_PUBLIC_TOKEN, DEMO_DB_ID } from "@/lib/demo-data"
 
 export async function getPublicLink(providerAccountId: string) {
+    // Intercept Demo Account
+    if (providerAccountId === DEMO_ACCOUNT_ID) {
+        const headersList = await headers()
+        const host = headersList.get("host") || "localhost:3000"
+        const protocol = process.env.NODE_ENV === "development" ? "http" : "https"
+        return { url: `${protocol}://${host}/share/${DEMO_PUBLIC_TOKEN}` }
+    }
+
     if (!providerAccountId) return { error: "Account ID not provided" }
 
     const admin = createAdminClient()
@@ -44,6 +53,18 @@ export async function getPublicLink(providerAccountId: string) {
 }
 
 export async function getAccountByToken(token: string) {
+    // Intercept Demo Token
+    if (token === DEMO_PUBLIC_TOKEN) {
+        return {
+            account: {
+                provider_account_id: DEMO_ACCOUNT_ID,
+                name: 'Conta Demo Institucional',
+                id: DEMO_DB_ID,
+                public_token: DEMO_PUBLIC_TOKEN
+            }
+        }
+    }
+
     if (!token) return { error: "Token not provided" }
 
     const admin = createAdminClient()

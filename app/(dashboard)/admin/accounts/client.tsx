@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Trash2, CheckCircle2, AlertCircle, Loader2, Pencil } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, AlertCircle, Loader2, Pencil, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -26,7 +26,13 @@ export function AccountsManager({ accounts }: { accounts: AdAccount[] }) {
     const [isAddOpen, setIsAddOpen] = useState(false)
     const [deleteId, setDeleteId] = useState<string | null>(null)
     const [editingAccount, setEditingAccount] = useState<AdAccount | null>(null)
+    const [searchTerm, setSearchTerm] = useState('')
     const router = useRouter()
+
+    const filteredAccounts = accounts.filter(account =>
+        account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        account.provider_account_id.includes(searchTerm)
+    )
 
     const handleConnect = async (formData: FormData) => {
         setIsLoading(true)
@@ -67,105 +73,118 @@ export function AccountsManager({ accounts }: { accounts: AdAccount[] }) {
     }
 
     return (
-        <div className="space-y-6">
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+        <div className="space-y-8 pt-8 px-2 md:px-0">
+            {/* Header Section */}
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div>
-                        <CardTitle>Plataformas Conectadas</CardTitle>
-                        <CardDescription>Gerencie as conexões com plataformas de anúncios.</CardDescription>
+                        <h2 className="text-3xl font-bold tracking-tight">Contas Vinculadas</h2>
+                        <p className="text-muted-foreground mt-1">Gerencie as conexões com plataformas de anúncios.</p>
                     </div>
-                    <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-                        <DialogTrigger asChild>
-                            <Button className="bg-[#0668E1] hover:bg-[#0556B9]">
-                                <Plus className="mr-2 h-4 w-4" />
-                                Conectar Meta Ads
+                </div>
+
+                {/* Search Only */}
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                    <div className="relative w-full sm:w-auto sm:min-w-[320px] group">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                        <Input
+                            placeholder="Buscar conta..."
+                            className="pl-10 h-10 bg-white/80 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus-visible:ring-blue-500"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Content Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+                {/* Add New Card (Always First) */}
+                <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+                    <DialogTrigger asChild>
+                        <button className="flex flex-col items-center justify-center gap-4 p-6 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-800 text-slate-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all duration-300 min-h-[200px] cursor-pointer bg-white/50 dark:bg-slate-950/20">
+                            <div className="h-14 w-14 rounded-full bg-slate-50 dark:bg-slate-900 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
+                                <Plus className="h-6 w-6" />
+                            </div>
+                            <span className="font-semibold text-sm">Conectar Nova Conta</span>
+                        </button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Conectar Meta Ads</DialogTitle>
+                            <DialogDescription>
+                                Insira o Token de Acesso e o ID da Conta de Anúncios.
+                                <br />
+                                <span className="text-xs text-muted-foreground">Você pode gerar um Token de Longa Duração no portal de Desenvolvedores do Facebook.</span>
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form action={handleConnect} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="name">Nome de Identificação</Label>
+                                <Input id="name" name="name" required placeholder="Ex: Conta Principal - M3" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="account_id">ID da Conta de Anúncios (act_...)</Label>
+                                <Input id="account_id" name="account_id" required placeholder="act_1234567890" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="access_token">Token de Acesso (Long-Lived)</Label>
+                                <Input id="access_token" name="access_token" type="password" required placeholder="EAA..." />
+                            </div>
+                            <DialogFooter>
+                                <Button type="submit" disabled={isLoading} className="bg-[#0668E1] hover:bg-[#0556B9]">
+                                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (
+                                        <MetaIcon className="mr-2 h-4 w-4" />
+                                    )}
+                                    Conectar
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+
+                {filteredAccounts.map((account) => (
+                    <Card key={account.id} className="relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group bg-white dark:bg-slate-950 min-h-[200px] flex flex-col justify-between">
+                        <CardHeader className="pb-3">
+                            <div className="flex justify-between items-start">
+                                <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-800 dark:text-slate-100">
+                                    <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                                        <MetaIcon className="w-5 h-5" />
+                                    </div>
+                                    <span className="truncate">{account.name}</span>
+                                </CardTitle>
+                                <Badge variant={account.status === 'active' ? 'default' : 'destructive'} className={account.status === 'active' ? "bg-green-600 hover:bg-green-700" : ""}>
+                                    {account.status === 'active' ? 'Ativo' : 'Erro'}
+                                </Badge>
+                            </div>
+                            <CardDescription className="text-xs font-mono mt-1 px-1 py-0.5 bg-slate-100 dark:bg-slate-900 w-fit rounded text-slate-500" title={account.provider_account_id}>
+                                ID: {account.provider_account_id}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pb-4">
+                            <div className="text-xs text-muted-foreground flex items-center gap-2 pl-1">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                                <span>Sincronizado: {account.last_synced_at ? new Date(account.last_synced_at).toLocaleDateString('pt-BR') : 'Ainda não'}</span>
+                            </div>
+                        </CardContent>
+                        <CardFooter className="pt-2 flex justify-between gap-2 border-t bg-slate-50/50 dark:bg-slate-900/50 p-4">
+                            <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8 px-2" onClick={() => setDeleteId(account.id)}>
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Desconectar
                             </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Conectar Meta Ads</DialogTitle>
-                                <DialogDescription>
-                                    Insira o Token de Acesso e o ID da Conta de Anúncios.
-                                    <br />
-                                    <span className="text-xs text-muted-foreground">Você pode gerar um Token de Longa Duração no portal de Desenvolvedores do Facebook.</span>
-                                </DialogDescription>
-                            </DialogHeader>
-                            <form action={handleConnect} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">Nome de Identificação</Label>
-                                    <Input id="name" name="name" required placeholder="Ex: Conta Principal - M3" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="account_id">ID da Conta de Anúncios (act_...)</Label>
-                                    <Input id="account_id" name="account_id" required placeholder="act_1234567890" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="access_token">Token de Acesso (Long-Lived)</Label>
-                                    <Input id="access_token" name="access_token" type="password" required placeholder="EAA..." />
-                                </div>
-                                <DialogFooter>
-                                    <Button type="submit" disabled={isLoading} className="bg-[#0668E1] hover:bg-[#0556B9]">
-                                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (
-                                            <MetaIcon className="mr-2 h-4 w-4" />
-                                        )}
-                                        Conectar
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-                </CardHeader>
-                <CardContent>
-                    {accounts.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
-                            <AlertCircle className="h-10 w-10 mb-4 opacity-20" />
-                            <p>Nenhuma conta conectada.</p>
-                        </div>
-                    ) : (
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            {accounts.map((account) => (
-                                <Card key={account.id} className="relative overflow-hidden border-l-4 border-l-[#0668E1]">
-                                    <CardHeader className="pb-2">
-                                        <div className="flex justify-between items-start">
-                                            <CardTitle className="text-base font-medium flex items-center gap-2">
-                                                <MetaIcon className="w-6 h-6" />
-                                                {account.name}
-                                            </CardTitle>
-                                            <Badge variant={account.status === 'active' ? 'default' : 'destructive'} className={account.status === 'active' ? "bg-green-600" : ""}>
-                                                {account.status === 'active' ? 'Ativo' : 'Erro'}
-                                            </Badge>
-                                        </div>
-                                        <CardDescription className="text-xs truncate" title={account.provider_account_id}>
-                                            ID: {account.provider_account_id}
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="pb-2">
-                                        <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                            <CheckCircle2 className="h-3 w-3 text-green-600" />
-                                            Sincronizado: {account.last_synced_at ? new Date(account.last_synced_at).toLocaleDateString() : 'Ainda não'}
-                                        </div>
-                                    </CardContent>
-                                    <CardFooter className="pt-2 justify-end gap-2">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="h-8 px-2"
-                                            onClick={() => setEditingAccount(account)}
-                                        >
-                                            <Pencil className="h-4 w-4 mr-2" />
-                                            Editar
-                                        </Button>
-                                        <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8 px-2" onClick={() => setDeleteId(account.id)}>
-                                            <Trash2 className="h-4 w-4 mr-2" />
-                                            Desconectar
-                                        </Button>
-                                    </CardFooter>
-                                </Card>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-3"
+                                onClick={() => setEditingAccount(account)}
+                            >
+                                <Pencil className="h-3.5 w-3.5 mr-2" />
+                                Editar
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                ))}
+            </div>
 
             {/* EDIT DIALOG */}
             <Dialog open={!!editingAccount} onOpenChange={(open) => !open && setEditingAccount(null)}>
@@ -203,8 +222,7 @@ export function AccountsManager({ accounts }: { accounts: AdAccount[] }) {
                                     id="edit-access_token"
                                     name="access_token"
                                     type="password"
-                                    required
-                                    placeholder="Cole o novo token aqui..."
+                                    placeholder="Deixe em branco para manter o atual..."
                                 />
                             </div>
                             <DialogFooter>

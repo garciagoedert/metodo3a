@@ -1,7 +1,8 @@
 "use client"
 
-import { Menu, Link as LinkIcon, ExternalLink } from "lucide-react"
+import { Menu, Link as LinkIcon, ExternalLink, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import * as React from "react"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { ClientSelector } from "./client-selector"
 import { DateRangePicker } from "./date-range-picker"
@@ -9,6 +10,7 @@ import { Sidebar } from "./Sidebar"
 import { useUserRole } from "@/hooks/use-user-role"
 import { toast } from "sonner"
 import { getPublicLink } from "./share-actions"
+import { PaymentStatus } from "./payment-status"
 
 export function Header({ dateRange, accounts = [], currentAccountId }: {
     dateRange?: { from: Date, to: Date },
@@ -16,6 +18,7 @@ export function Header({ dateRange, accounts = [], currentAccountId }: {
     currentAccountId?: string
 }) {
     const { role } = useUserRole()
+    const [isCopied, setIsCopied] = React.useState(false)
 
     const handleShare = async (mode: 'copy' | 'open') => {
         if (!currentAccountId) {
@@ -34,6 +37,8 @@ export function Header({ dateRange, accounts = [], currentAccountId }: {
         if (mode === 'copy') {
             await navigator.clipboard.writeText(url)
             toast.success("Link copiado para a área de transferência!", { id: toastId })
+            setIsCopied(true)
+            setTimeout(() => setIsCopied(false), 2000)
         } else {
             toast.dismiss(toastId)
             window.open(url, '_blank')
@@ -43,8 +48,10 @@ export function Header({ dateRange, accounts = [], currentAccountId }: {
     return (
         <header className="sticky top-0 z-40 w-full flex flex-col md:flex-row h-auto md:h-16 items-start md:items-center justify-between border-b bg-background px-6 py-4 md:py-0 gap-4 md:gap-0 shadow-sm">
             <div className="flex w-full md:w-auto items-center justify-between gap-4">
-                <ClientSelector accounts={accounts} currentAccountId={currentAccountId} />
+                <ClientSelector className="w-auto flex-1 md:w-[400px]" accounts={accounts} currentAccountId={currentAccountId} />
+                <PaymentStatus accountId={currentAccountId} />
             </div>
+
 
             <div className="flex w-full md:w-auto flex-col md:flex-row items-stretch md:items-center gap-4">
                 <DateRangePicker className="w-full md:w-auto" initialDate={dateRange} />
@@ -56,8 +63,8 @@ export function Header({ dateRange, accounts = [], currentAccountId }: {
                         className="flex-1 md:flex-none gap-2"
                         onClick={() => handleShare('copy')}
                     >
-                        <LinkIcon className="h-4 w-4" />
-                        <span className="whitespace-nowrap">Copiar Link</span>
+                        {isCopied ? <Check className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}
+                        <span className="whitespace-nowrap">{isCopied ? "Copiado!" : "Copiar Link"}</span>
                     </Button>
                     <Button
                         size="sm"

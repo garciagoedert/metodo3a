@@ -98,14 +98,12 @@ export function AdCreativeGallery({ ads }: AdCreativeGalleryProps) {
                     Top Anúncios
                 </div>
 
-                <div className="flex flex-col items-end gap-2 ml-auto">
-                    <div className="flex flex-wrap justify-end gap-2">
+                <div className="w-full md:w-auto mt-2 md:mt-0 md:ml-auto">
+                    <div className="grid grid-cols-3 gap-2 w-full md:flex md:flex-wrap md:justify-end text-center">
                         <SortButton metric="spend" label="Valor Gasto" icon={DollarSign} />
                         <SortButton metric="impressions" label="Impressões" icon={Eye} />
-                        <SortButton metric="clicks" label="Cliques no Link" icon={MousePointer2} />
+                        <SortButton metric="clicks" label="Cliques Link" icon={MousePointer2} />
                         <SortButton metric="profile_visits" label="Visitas Perfil" icon={ExternalLink} />
-                    </div>
-                    <div className="flex flex-wrap justify-end gap-2">
                         <SortButton metric="conversations" label="Conversas" icon={MessageCircle} />
                         <SortButton metric="reach" label="Alcance" icon={Users} />
                         <SortButton metric="frequency" label="Frequência" icon={Repeat} />

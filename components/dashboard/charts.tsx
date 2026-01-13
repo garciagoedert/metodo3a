@@ -1,8 +1,11 @@
 "use client"
 
-import { Area, AreaChart, Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell, CartesianGrid } from "recharts"
+import { Area, AreaChart, Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell, CartesianGrid, ReferenceLine } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { format, parseISO } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { useState, useEffect } from "react"
+import { Slider } from "@/components/ui/slider"
 
 interface ChartMetricConfig {
     dataKey: string
@@ -22,6 +25,17 @@ export function PerformanceChart({
 }: PerformanceChartProps) {
     if (metrics.length === 0) return null
 
+    // Sort data
+    const sortedData = [...data].sort((a, b) => a.date.localeCompare(b.date))
+
+    // State for Mobile Slider
+    const [selectedIndex, setSelectedIndex] = useState<number>(sortedData.length - 1)
+
+    // Update selected index when data length changes (e.g. month change)
+    useEffect(() => {
+        setSelectedIndex(sortedData.length - 1)
+    }, [data.length])
+
     // Dual Axis Logic: Determine which metrics go to which axis
     // Heuristic: If label contains "%" or "CTR" or "Frequência", use Right Axis.
     const isRightAxis = (metric: ChartMetricConfig) => metric.label.includes("CTR") || metric.label.includes("Frequência")
@@ -29,8 +43,7 @@ export function PerformanceChart({
     const hasRightAxisMetrics = metrics.some(isRightAxis)
     const hasLeftAxisMetrics = metrics.some(m => !isRightAxis(m))
 
-    // Ensure data is sorted by date ascending (Oldest -> Newest) using standard string comparison for ISO dates
-    const sortedData = [...data].sort((a, b) => a.date.localeCompare(b.date))
+    const selectedData = sortedData[selectedIndex]
 
     return (
         <Card>
@@ -104,6 +117,9 @@ export function PerformanceChart({
                                 />
                             )}
 
+                            {/* Mobile Reference Line (Guide) */}
+                            <ReferenceLine x={selectedData?.date} stroke="#94a3b8" strokeDasharray="3 3" className="md:hidden" />
+
                             <Tooltip
                                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                                 labelStyle={{ color: '#666' }}
@@ -141,6 +157,44 @@ export function PerformanceChart({
                             })}
                         </AreaChart>
                     </ResponsiveContainer>
+                </div>
+
+                {/* Mobile Slider Controls */}
+                <div className="px-5 mt-4 md:hidden space-y-4">
+                    <div>
+                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block flex justify-between">
+                            <span>Selecionar Dia</span>
+                            <span className="text-slate-900 dark:text-slate-100">
+                                {selectedData ? format(parseISO(selectedData.date), "dd/MM", { locale: ptBR }) : ""}
+                            </span>
+                        </label>
+                        <Slider
+                            value={[selectedIndex]}
+                            max={Math.max(0, sortedData.length - 1)}
+                            step={1}
+                            onValueChange={(val) => setSelectedIndex(val[0])}
+                            className="w-full cursor-pointer"
+                        />
+                    </div>
+
+                    {/* Selected Info Box */}
+                    {selectedData && (
+                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 border space-y-3">
+                            <div className="text-sm font-bold text-slate-800 dark:text-slate-200 border-b pb-2">
+                                {format(parseISO(selectedData.date), "d 'de' MMMM", { locale: ptBR })}
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                {metrics.map(m => (
+                                    <div key={m.dataKey} className="flex flex-col">
+                                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{m.label}</span>
+                                        <span className="text-base font-semibold" style={{ color: m.color }}>
+                                            {m.formatter ? m.formatter(selectedData[m.dataKey]) : selectedData[m.dataKey]}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </CardContent>
         </Card>

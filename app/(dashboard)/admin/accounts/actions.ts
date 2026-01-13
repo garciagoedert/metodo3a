@@ -92,32 +92,38 @@ export async function updateMetaAccount(id: string, formData: FormData) {
 
     // Note: Provider Account ID is usually constant, avoiding editing it to prevent mismatches
 
-    if (!name || !accessToken) {
-        return { error: "Nome e Token são obrigatórios." }
+    if (!name) {
+        return { error: "Nome é obrigatório." }
     }
 
-    // 1. Validate New Token with Meta API
-    try {
-        const response = await fetch(`https://graph.facebook.com/v19.0/me?access_token=${accessToken}`)
-        const data = await response.json()
+    const updates: any = {
+        name: name,
+        updated_at: new Date().toISOString()
+    }
 
-        if (data.error) {
-            return { error: `Erro na validação do Token: ${data.error.message}` }
+    // Only update and validate token if a new one is provided
+    if (accessToken && accessToken.trim() !== '') {
+        // 1. Validate New Token with Meta API
+        try {
+            const response = await fetch(`https://graph.facebook.com/v19.0/me?access_token=${accessToken}`)
+            const data = await response.json()
+
+            if (data.error) {
+                return { error: `Erro na validação do Token: ${data.error.message}` }
+            }
+        } catch (err) {
+            return { error: "Falha ao validar com a API do Facebook." }
         }
-    } catch (err) {
-        return { error: "Falha ao validar com a API do Facebook." }
+
+        updates.access_token = accessToken
+        updates.status = 'active'
     }
 
     // 2. Update DB
     const admin = createAdminClient()
 
     const { error } = await admin.from('ad_accounts')
-        .update({
-            name: name,
-            access_token: accessToken,
-            status: 'active', // Reset status to active on update
-            updated_at: new Date().toISOString()
-        })
+        .update(updates)
         .eq('id', id)
 
     if (error) {

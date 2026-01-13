@@ -10,9 +10,6 @@ export default async function AccountsPage() {
 
     return (
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <div className="flex items-center justify-between space-y-2">
-                <h2 className="text-3xl font-bold tracking-tight">Contas Vinculadas</h2>
-            </div>
             <AccountsManager accounts={accounts || []} />
         </div>
     )

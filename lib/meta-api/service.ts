@@ -669,6 +669,31 @@ export class MetaApiService {
         const sorted = Object.values(aggMap).sort((a: any, b: any) => b.metrics.spend - a.metrics.spend)
         return sorted.slice(0, 50)
     }
+
+    /**
+     * Get Basic Account Details for Payment Status
+     */
+    async getAccountDetails(): Promise<{ status: number, disable_reason: number, balance: number, currency: string, is_prepay_account: boolean, amount_spent: number, timezone_offset_hours_utc: number }> {
+        try {
+            const data = await this.fetch('', {
+                fields: 'account_status,disable_reason,balance,currency,is_prepay_account,amount_spent,timezone_offset_hours_utc'
+            }, false)
+
+            return {
+                status: data.account_status,
+                disable_reason: data.disable_reason,
+                balance: parseInt(data.balance || '0'),
+                currency: data.currency,
+                is_prepay_account: !!data.is_prepay_account,
+                amount_spent: parseInt(data.amount_spent || '0'),
+                timezone_offset_hours_utc: data.timezone_offset_hours_utc
+            }
+        } catch (e) {
+            console.error("Meta API Failed (getAccountDetails):", e)
+            // Fallback to error state
+            return { status: 2, disable_reason: 0, balance: 0, currency: 'BRL', is_prepay_account: false, amount_spent: 0, timezone_offset_hours_utc: -3 }
+        }
+    }
 }
 
 // Factory to create service from DB account

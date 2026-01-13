@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { MetricCard } from "./metric-card"
 import { PerformanceChart } from "./charts"
 import { AdCreativeGallery } from "./ad-creative-gallery"
 import { FunnelSection } from "./funnel-section"
 import { FunnelMetricsDialog } from "./funnel-metrics-dialog"
-import { MousePointer2, DollarSign, Tag, TrendingUp, Users, MessageSquare, Clock, Eye, UserPlus, UserCheck, Calendar, CheckCircle2, Check } from "lucide-react"
+import { GoalProgressBar } from "./goal-progress-bar"
+import { getAccountGoals, getGoalsProgress } from "@/app/(dashboard)/actions"
+import { startOfMonth, endOfMonth, parseISO, isSameMonth } from "date-fns"
+import { MousePointer2, DollarSign, Tag, TrendingUp, Users, MessageSquare, Clock, Eye, UserPlus, UserCheck, Calendar, CheckCircle2, Check, ChevronLeft, ChevronRight } from "lucide-react"
 
 interface DashboardInteractiveBoardProps {
     insights: any
@@ -17,6 +20,7 @@ interface DashboardInteractiveBoardProps {
     funnelData: any
     accountId?: string
     monthStart: string
+    dateRange?: { from: Date, to: Date } // Added prop
     dashboardConfig?: any
     readOnly?: boolean
 }
@@ -61,7 +65,7 @@ export const METRIC_CONFIG: Record<string, { label: string, color: string, gradi
         gradient: "from-orange-500 to-orange-600",
         icon: Calendar,
         prefix: "",
-        formatter: (v) => v > 0 ? v.toLocaleString('pt-BR') : "?"
+        formatter: (v) => v.toLocaleString('pt-BR')
     },
     showed: {
         label: "Compareceram",
@@ -69,7 +73,7 @@ export const METRIC_CONFIG: Record<string, { label: string, color: string, gradi
         gradient: "from-emerald-500 to-emerald-600",
         icon: CheckCircle2,
         prefix: "",
-        formatter: (v) => v > 0 ? v.toLocaleString('pt-BR') : "?"
+        formatter: (v) => v.toLocaleString('pt-BR')
     },
     inline_link_clicks: {
         label: "Cliques no Link",
@@ -122,8 +126,16 @@ export const METRIC_CONFIG: Record<string, { label: string, color: string, gradi
     }
 }
 
-export function DashboardInteractiveBoard({ insights, daily, distribution, topCreatives, manualMetrics, funnelData, accountId, monthStart, dashboardConfig, readOnly = false }: DashboardInteractiveBoardProps) {
+export function DashboardInteractiveBoard({ insights, daily, distribution, topCreatives, manualMetrics, funnelData, accountId, monthStart, dateRange, dashboardConfig, readOnly = false }: DashboardInteractiveBoardProps) {
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>(["spend"])
+    const [goals, setGoals] = useState<any[]>([])
+    const selectedDate = parseISO(monthStart)
+
+    useEffect(() => {
+        if (accountId) {
+            getGoalsProgress(accountId).then(data => setGoals(data || []))
+        }
+    }, [accountId])
 
     const conversasValue = insights?.actions
         ? insights.actions
@@ -155,12 +167,29 @@ export function DashboardInteractiveBoard({ insights, daily, distribution, topCr
 
     const getMetricValue = (key: string) => {
         if (key === 'conversations') return conversasValue
-        if (key === 'scheduled') return manualMetrics?.appointments_scheduled || 0
-        if (key === 'showed') return manualMetrics?.appointments_showed || 0
+
+        // Explicit mapping for mismatched keys
+        if (key === 'followers') return funnelData?.newFollowers ?? null
+        if (key === 'profile_visits') return funnelData?.profileViews ?? insights?.profile_visits ?? 0
+
+        if (key === 'scheduled') return manualMetrics?.appointments_scheduled ?? null
+        if (key === 'showed') return manualMetrics?.appointments_showed ?? null
+
         // Fallback checks
         if (funnelData && funnelData[key] !== undefined) return funnelData[key]
         if (insights && insights[key] !== undefined) return insights[key]
         return 0
+    }
+
+    // --- Carousel Logic ---
+    const perfRef = useRef<HTMLDivElement>(null)
+    const finRef = useRef<HTMLDivElement>(null)
+
+    const scroll = (ref: React.RefObject<HTMLDivElement | null>, direction: 'left' | 'right') => {
+        if (ref.current) {
+            const scrollAmount = 300 // Approximately 2 cards width
+            ref.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' })
+        }
     }
 
     // --- Dynamic Performance Cards Logic ---
@@ -192,134 +221,189 @@ export function DashboardInteractiveBoard({ insights, daily, distribution, topCr
     }))
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="flex flex-col gap-6">
+            {goals.filter(goal => {
+                // Archive Visibility Logic: Show if met this month
+                let showArchived = false
+                if (goal.archived && goal.completed_at) {
+                    const metDate = parseISO(goal.completed_at)
+                    if (isSameMonth(metDate, selectedDate)) showArchived = true
+                }
 
-            {/* LEFT COLUMN: Metrics & Charts (Span 8) */}
-            <div className="lg:col-span-8 space-y-6">
+                if (goal.archived && !showArchived) return false
+                if (goal.period !== 'monthly') return true
 
-                {/* 1. Performance Metrics Row */}
-                <div>
-                    <h2 className="text-sm font-semibold flex items-center gap-2 mb-3 text-slate-500 uppercase tracking-wider">
-                        <MousePointer2 className="h-4 w-4" />
-                        Performance de Anúncios
-                    </h2>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        {performanceMetrics.map(key => {
-                            const config = METRIC_CONFIG[key] || { label: key, color: '#000', prefix: '' }
-                            const val = getMetricValue(key)
-                            return (
-                                <MetricCard
-                                    key={key}
-                                    title={config.label}
-                                    value={config.formatter ? config.formatter(val) : val.toLocaleString('pt-BR')}
-                                    description={config.label}
-                                    icon={config.icon || MousePointer2}
-                                    isActive={selectedMetrics.includes(key)}
-                                    activeColor={config.color}
-                                    onClick={() => handleMetricClick(key)}
-                                    className="py-3"
-                                />
-                            )
-                        })}
-                    </div>
-                </div>
+                const goalDate = goal.start_date ? parseISO(goal.start_date) : new Date()
+                const goalStart = startOfMonth(goalDate)
+                const goalEnd = endOfMonth(goalDate)
 
-                {/* 2. Financial Metrics Row */}
-                <div>
-                    <h2 className="text-sm font-semibold flex items-center gap-2 mb-3 text-slate-500 uppercase tracking-wider">
-                        <DollarSign className="h-4 w-4" />
-                        Investimento & Retorno
-                    </h2>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <MetricCard
-                            title="Valor Usado"
-                            value={`R$ ${(insights?.spend || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                            description="Investimento Total"
-                            icon={DollarSign}
-                            isActive={selectedMetrics.includes('spend')}
-                            activeColor={METRIC_CONFIG['spend'].color}
-                            onClick={() => handleMetricClick('spend')}
-                            className="py-3"
-                        />
-                        <MetricCard
-                            title="CPC (Custo p/ Clique)"
-                            value={`R$ ${(insights?.cpc || 0).toFixed(2)}`}
-                            description="Média Geral"
-                            icon={Tag}
-                            isActive={selectedMetrics.includes('cpc')}
-                            activeColor={METRIC_CONFIG['cpc'].color}
-                            onClick={() => handleMetricClick('cpc')}
-                            className="py-3"
-                        />
-                        <MetricCard
-                            title="Custo p/ Seguidor"
-                            value={`R$ ${(function () {
-                                const followers = getMetricValue('followers');
-                                const spend = insights?.spend || 0;
-                                return followers > 0 ? (spend / followers).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00';
-                            })()}`}
-                            description="Valor / Novos Seg"
-                            icon={Users}
-                            className="py-3"
-                        />
-                        {manualMetrics?.appointments_scheduled > 0 && (
-                            <MetricCard
-                                title="CPA (Agendamento)"
-                                value={`R$ ${((insights?.spend || 0) / manualMetrics.appointments_scheduled).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                                description="Custo / Agenda"
-                                icon={Check}
-                                className="py-3"
-                            />
-                        )}
-                    </div>
-                </div>
+                const rangeFrom = dateRange?.from || new Date()
+                const rangeTo = dateRange?.to || new Date()
 
-                {/* 3. Charts Section */}
-                <div className="grid grid-cols-1 gap-6">
-                    <PerformanceChart
-                        data={daily}
-                        metrics={chartMetrics}
+                // Ensure comparison works (dates)
+                return (goalStart <= rangeTo) && (goalEnd >= rangeFrom)
+            }).map(goal => {
+                const goalTotal = goal.current || 0
+                const goalPeriod = getMetricValue(goal.metric)
+                const goalLabel = METRIC_CONFIG[goal.metric]?.label || goal.metric
+
+                return (
+                    <GoalProgressBar
+                        key={goal.id || goal.metric}
+                        metricLabel={goalLabel}
+                        current={goalTotal}
+                        periodCurrent={goalPeriod}
+                        target={goal.target}
+                        periodLabel={goal.period === 'monthly' ? 'Meta Mensal' : 'Meta Geral'}
+                        completedAt={goal.completed_at}
                     />
-                </div>
+                )
+            })}
 
-                {/* 4. Top Creatives */}
-                <div className="mt-2">
-                    <AdCreativeGallery ads={topCreatives} />
-                </div>
-            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-            <div className="lg:col-span-4">
-                <div className="sticky top-24 -mt-[10px]">
-                    {/* Header: Funnel Title & Edit Button (Absolute Positioned for alignment) */}
-                    <div className="relative shrink-0">
-                        <h2 className="text-sm font-semibold flex items-center gap-2 mb-3 text-slate-500 uppercase tracking-wider">
-                            <Eye className="h-4 w-4" />
-                            Funil de Conversão
-                        </h2>
-                        <div className="absolute right-0 top-[-2px]">
-                            {!readOnly && (
-                                <FunnelMetricsDialog
-                                    accountId={accountId || ""}
-                                    currentMonthStart={monthStart}
-                                    currentConfig={funnelStepsConfig}
+                {/* LEFT COLUMN: Metrics & Charts (Span 8) */}
+                <div className="lg:col-span-8 space-y-6 order-2 lg:order-1">
+
+                    {/* 1. Performance Metrics Row */}
+                    <div>
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-sm font-semibold flex items-center gap-2 text-slate-500 uppercase tracking-wider">
+                                <MousePointer2 className="h-4 w-4" />
+                                Performance de Anúncios
+                            </h2>
+                            <div className="flex gap-1 md:hidden">
+                                <button onClick={() => scroll(perfRef, 'left')} className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
+                                    <ChevronLeft className="h-5 w-5 text-slate-500" />
+                                </button>
+                                <button onClick={() => scroll(perfRef, 'right')} className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
+                                    <ChevronRight className="h-5 w-5 text-slate-500" />
+                                </button>
+                            </div>
+                        </div>
+                        <div ref={perfRef} className="flex overflow-x-auto pb-2 -mx-6 px-6 snap-x gap-3 md:grid md:grid-cols-4 md:gap-3 md:pb-0 md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                            {performanceMetrics.map(key => {
+                                const config = METRIC_CONFIG[key] || { label: key, color: '#000', prefix: '' }
+                                const val = getMetricValue(key)
+                                return (
+                                    <MetricCard
+                                        key={key}
+                                        title={config.label}
+                                        value={config.formatter ? config.formatter(val) : val.toLocaleString('pt-BR')}
+                                        icon={config.icon || MousePointer2}
+                                        isActive={selectedMetrics.includes(key)}
+                                        activeColor={config.color}
+                                        onClick={() => handleMetricClick(key)}
+                                        className="py-3 min-w-[150px] snap-center md:min-w-0"
+                                    />
+                                )
+                            })}
+                        </div>
+                    </div>
+
+                    {/* 2. Financial Metrics Row */}
+                    <div>
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-sm font-semibold flex items-center gap-2 text-slate-500 uppercase tracking-wider">
+                                <DollarSign className="h-4 w-4" />
+                                Investimento & Retorno
+                            </h2>
+                            <div className="flex gap-1 md:hidden">
+                                <button onClick={() => scroll(finRef, 'left')} className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
+                                    <ChevronLeft className="h-5 w-5 text-slate-500" />
+                                </button>
+                                <button onClick={() => scroll(finRef, 'right')} className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
+                                    <ChevronRight className="h-5 w-5 text-slate-500" />
+                                </button>
+                            </div>
+                        </div>
+                        <div ref={finRef} className="flex overflow-x-auto pb-2 -mx-6 px-6 snap-x gap-3 md:grid md:grid-cols-4 md:gap-3 md:pb-0 md:mx-0 md:px-0 scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                            <MetricCard
+                                title="Valor Usado"
+                                value={`R$ ${(insights?.spend || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                icon={DollarSign}
+                                isActive={selectedMetrics.includes('spend')}
+                                activeColor={METRIC_CONFIG['spend'].color}
+                                onClick={() => handleMetricClick('spend')}
+                                className="py-3 min-w-[150px] snap-center md:min-w-0"
+                            />
+                            <MetricCard
+                                title="CPC (Custo p/ Clique)"
+                                value={`R$ ${(insights?.cpc || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                icon={Tag}
+                                isActive={selectedMetrics.includes('cpc')}
+                                activeColor={METRIC_CONFIG['cpc'].color}
+                                onClick={() => handleMetricClick('cpc')}
+                                className="py-3 min-w-[150px] snap-center md:min-w-0"
+                            />
+                            <MetricCard
+                                title="Custo p/ Seguidor"
+                                value={`R$ ${(function () {
+                                    const followers = getMetricValue('followers');
+                                    const spend = insights?.spend || 0;
+                                    return followers > 0 ? (spend / followers).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00';
+                                })()}`}
+                                icon={Users}
+                                className="py-3 min-w-[150px] snap-center md:min-w-0"
+                            />
+                            {manualMetrics?.appointments_scheduled > 0 && (
+                                <MetricCard
+                                    title="CPA (Agendamento)"
+                                    value={`R$ ${((insights?.spend || 0) / manualMetrics.appointments_scheduled).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                    icon={Check}
+                                    className="py-3 min-w-[150px] snap-center md:min-w-0"
                                 />
                             )}
                         </div>
                     </div>
 
-                    {/* Funnel Box */}
-                    <div className="bg-white dark:bg-slate-950 rounded-xl border shadow-sm p-4 max-h-[calc(100vh-8rem)] overflow-y-auto custom-scrollbar">
-                        {resolvedFunnelSteps.length > 0 ? (
-                            <FunnelSection
-                                steps={resolvedFunnelSteps}
-                                selectedMetrics={selectedMetrics}
-                                onMetricClick={handleMetricClick}
-                            />
-                        ) : (
-                            <div className="flex items-center justify-center h-40 text-muted-foreground">
-                                Carregando funil...
+                    {/* 3. Charts Section */}
+                    <div className="grid grid-cols-1 gap-6">
+                        <PerformanceChart
+                            data={daily}
+                            metrics={chartMetrics}
+                        />
+                    </div>
+
+                    {/* 4. Top Creatives */}
+                    <div className="mt-2">
+                        <AdCreativeGallery ads={topCreatives} />
+                    </div>
+                </div>
+
+                <div className="lg:col-span-4 order-1 lg:order-2">
+                    <div className="sticky top-24 -mt-[10px]">
+                        {/* Header: Funnel Title & Edit Button (Absolute Positioned for alignment) */}
+                        <div className="relative shrink-0">
+                            <h2 className="text-sm font-semibold flex items-center gap-2 mb-3 text-slate-500 uppercase tracking-wider">
+                                <Eye className="h-4 w-4" />
+                                Funil de Conversão
+                            </h2>
+                            <div className="absolute right-0 top-[-2px]">
+                                {!readOnly && (
+                                    <FunnelMetricsDialog
+                                        accountId={accountId || ""}
+                                        currentMonthStart={monthStart}
+                                        currentConfig={funnelStepsConfig}
+                                    />
+                                )}
                             </div>
-                        )}
+                        </div>
+
+                        {/* Funnel Box */}
+                        <div className="bg-white dark:bg-slate-950 rounded-xl border shadow-sm p-4 h-auto max-h-none lg:max-h-[calc(100vh-8rem)] overflow-visible lg:overflow-y-auto custom-scrollbar">
+                            {resolvedFunnelSteps.length > 0 ? (
+                                <FunnelSection
+                                    steps={resolvedFunnelSteps}
+                                    selectedMetrics={selectedMetrics}
+                                    onMetricClick={handleMetricClick}
+                                />
+                            ) : (
+                                <div className="flex items-center justify-center h-40 text-muted-foreground">
+                                    Carregando funil...
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

@@ -143,6 +143,14 @@ export function DateRangePicker({
     }
 
     const [open, setOpen] = React.useState(false)
+    const [isMobile, setIsMobile] = React.useState(false)
+
+    React.useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768)
+        checkMobile()
+        window.addEventListener('resize', checkMobile)
+        return () => window.removeEventListener('resize', checkMobile)
+    }, [])
 
     return (
         <div className={cn("grid gap-2", className)}>
@@ -173,20 +181,20 @@ export function DateRangePicker({
                         )}
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                    <div className="flex">
-                        <div className="p-3 border-r w-[180px] flex flex-col gap-1">
-                            <Button variant={preset === 'today' ? 'secondary' : 'ghost'} className="w-full justify-start text-xs font-normal" onClick={() => handlePresetChange('today')}>Hoje</Button>
-                            <Button variant={preset === 'this_week' ? 'secondary' : 'ghost'} className="w-full justify-start text-xs font-normal" onClick={() => handlePresetChange('this_week')}>Essa semana</Button>
-                            <Button variant={preset === 'last_15d' ? 'secondary' : 'ghost'} className="w-full justify-start text-xs font-normal" onClick={() => handlePresetChange('last_15d')}>Últimos 15 dias</Button>
-                            <Button variant={preset === 'this_month' ? 'secondary' : 'ghost'} className="w-full justify-start text-xs font-normal" onClick={() => handlePresetChange('this_month')}>Esse mês</Button>
-                            <Button variant={preset === 'last_month' ? 'secondary' : 'ghost'} className="w-full justify-start text-xs font-normal" onClick={() => handlePresetChange('last_month')}>Último mês</Button>
-                            <Button variant={preset === 'last_30d' ? 'secondary' : 'ghost'} className="w-full justify-start text-xs font-normal" onClick={() => handlePresetChange('last_30d')}>Últimos 30 dias</Button>
-                            <Button variant={preset === 'last_60d' ? 'secondary' : 'ghost'} className="w-full justify-start text-xs font-normal" onClick={() => handlePresetChange('last_60d')}>Últimos 60 dias</Button>
-                            <Button variant={preset === 'last_90d' ? 'secondary' : 'ghost'} className="w-full justify-start text-xs font-normal" onClick={() => handlePresetChange('last_90d')}>Últimos 90 dias</Button>
-                            <Button variant={preset === 'maximum' ? 'secondary' : 'ghost'} className="w-full justify-start text-xs font-normal mb-2" onClick={() => handlePresetChange('maximum')}>Todo período</Button>
+                <PopoverContent className="w-auto p-0" align="end" avoidCollisions={true}>
+                    <div className="flex flex-col md:flex-row">
+                        <div className="p-2 md:p-3 border-b md:border-b-0 md:border-r w-full md:w-[180px] grid grid-cols-2 md:flex md:flex-col gap-2">
+                            <Button variant={preset === 'today' ? 'secondary' : 'ghost'} className="h-8 md:h-9 justify-center md:justify-start text-xs font-normal" onClick={() => handlePresetChange('today')}>Hoje</Button>
+                            <Button variant={preset === 'this_week' ? 'secondary' : 'ghost'} className="h-8 md:h-9 justify-center md:justify-start text-xs font-normal" onClick={() => handlePresetChange('this_week')}>Esta Semana</Button>
+                            <Button variant={preset === 'this_month' ? 'secondary' : 'ghost'} className="h-8 md:h-9 justify-center md:justify-start text-xs font-normal" onClick={() => handlePresetChange('this_month')}>Este Mês</Button>
+                            <Button variant={preset === 'last_month' ? 'secondary' : 'ghost'} className="h-8 md:h-9 justify-center md:justify-start text-xs font-normal" onClick={() => handlePresetChange('last_month')}>Mês Passado</Button>
 
+                            <Button variant={preset === 'last_7d' ? 'secondary' : 'ghost'} className="h-8 md:h-9 justify-center md:justify-start text-xs font-normal" onClick={() => handlePresetChange('last_7d')}>7 Dias</Button>
+                            <Button variant={preset === 'last_15d' ? 'secondary' : 'ghost'} className="h-8 md:h-9 justify-center md:justify-start text-xs font-normal" onClick={() => handlePresetChange('last_15d')}>15 Dias</Button>
+                            <Button variant={preset === 'last_30d' ? 'secondary' : 'ghost'} className="h-8 md:h-9 justify-center md:justify-start text-xs font-normal" onClick={() => handlePresetChange('last_30d')}>30 Dias</Button>
+                            <Button variant={preset === 'last_90d' ? 'secondary' : 'ghost'} className="h-8 md:h-9 justify-center md:justify-start text-xs font-normal" onClick={() => handlePresetChange('last_90d')}>90 Dias</Button>
 
+                            <Button variant={preset === 'maximum' ? 'secondary' : 'ghost'} className="col-span-2 md:col-span-1 h-8 md:h-9 justify-center md:justify-start text-xs font-normal md:mb-2" onClick={() => handlePresetChange('maximum')}>Todo Período</Button>
                         </div>
                         <div className="flex flex-col justify-between">
                             <Calendar
@@ -198,7 +206,7 @@ export function DateRangePicker({
                                     setDate(val)
                                     setPreset("custom")
                                 }}
-                                numberOfMonths={2}
+                                numberOfMonths={isMobile ? 1 : 2}
                             />
                             <div className="p-3 border-t flex justify-end">
                                 <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
