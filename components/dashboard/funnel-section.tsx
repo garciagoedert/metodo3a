@@ -10,7 +10,7 @@ interface FunnelSectionProps {
     steps: any[]
     selectedMetrics?: string[]
     onMetricClick?: (key: string) => void
-    data?: FunnelData // Assuming FunnelData is defined elsewhere or will be added
+    data?: any
 }
 
 export function FunnelSection({ steps, selectedMetrics = [], onMetricClick, data: funnelData }: FunnelSectionProps) {
