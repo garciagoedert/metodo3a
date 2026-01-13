@@ -670,19 +670,61 @@ export class MetaApiService {
         return sorted.slice(0, 50)
     }
 
+    public async debugFetch(fields: string) {
+        return await this.fetch('', { fields }, false)
+    }
+
     /**
      * Get Basic Account Details for Payment Status
      */
     async getAccountDetails(): Promise<{ status: number, disable_reason: number, balance: number, currency: string, is_prepay_account: boolean, amount_spent: number, timezone_offset_hours_utc: number }> {
         try {
             const data = await this.fetch('', {
-                fields: 'account_status,disable_reason,balance,currency,is_prepay_account,amount_spent,timezone_offset_hours_utc'
+                fields: 'account_status,disable_reason,balance,currency,is_prepay_account,amount_spent,timezone_offset_hours_utc,funding_source_details'
             }, false)
+
+            let finalBalance = parseInt(data.balance || '0')
+
+            // Try to parse Prepaid Balance from funding_source_details
+            if (data.funding_source_details?.display_string) {
+                // Example: "Saldo disponível (R$302,31 BRL)"
+                // Regex to capture the number part: R$([\d.,]+) OR just digits/dots/commas
+                // We use a broader regex to capture the numeric string after "R$"
+                // Matches "302,31"
+                const match = data.funding_source_details.display_string.match(/R\$\s*([\d\.,]+)/)
+                if (match && match[1]) {
+                    // Brazilian format assumption for BRL: 1.000,00
+                    let numStr = match[1]
+                    // Remove thousands separator (.)
+                    numStr = numStr.replace(/\./g, '')
+                    // Replace decimal separator (,) with (.)
+                    numStr = numStr.replace(',', '.')
+
+                    const val = parseFloat(numStr)
+                    if (!isNaN(val)) {
+                        // Convert to CENTS (integer) because the UI expects CENTS
+                        finalBalance = Math.round(val * 100)
+
+                        // Wait! The UI logic:
+                        // `const rawBalance = Math.abs(Number(data.balance))`
+                        // `const balanceValue = rawBalance / divisor` (divisor=100)
+                        // If APi returns 31890 (cents), UI divides by 100 -> 318.90. Correct.
+                        // But Prepaid balance is CREDIT (Negative in standard API).
+                        // If I manually parsed 318.90, I have positive.
+                        // If I verify the UI logic: `Math.abs`.
+                        // So I can return Positive 31890.
+                        // BUT: If the original API `balance` was POSITIVE ("owed"), and I overwrite with Credit (Positive?),
+                        // The UI will show "Saldo Pré-pago R$ 318,90".
+                        // Is that correct?
+                        // Yes, if `isPrepay` is true.
+                    }
+                }
+            }
 
             return {
                 status: data.account_status,
                 disable_reason: data.disable_reason,
-                balance: parseInt(data.balance || '0'),
+                balance: finalBalance,
                 currency: data.currency,
                 is_prepay_account: !!data.is_prepay_account,
                 amount_spent: parseInt(data.amount_spent || '0'),
