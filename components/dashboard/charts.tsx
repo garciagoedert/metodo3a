@@ -188,7 +188,11 @@ export function PerformanceChart({
                                     <div key={m.dataKey} className="flex flex-col">
                                         <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{m.label}</span>
                                         <span className="text-base font-semibold" style={{ color: m.color }}>
-                                            {m.formatter ? m.formatter(selectedData[m.dataKey]) : selectedData[m.dataKey]}
+                                            {(() => {
+                                                const val = selectedData[m.dataKey]
+                                                if (val === undefined || val === null) return '-'
+                                                return m.formatter ? m.formatter(val) : val
+                                            })()}
                                         </span>
                                     </div>
                                 ))}
