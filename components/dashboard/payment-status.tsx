@@ -14,6 +14,7 @@ interface PaymentData {
     currency: string
     is_prepay_account: boolean
     amount_spent: number
+    timezone_offset_hours_utc?: number
 }
 
 export function PaymentStatus({ accountId, className }: { accountId?: string, className?: string }) {

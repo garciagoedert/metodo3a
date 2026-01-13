@@ -524,7 +524,7 @@ async function fetchMetaSum(service: any, metricName: string, startStr: string, 
     return 0
 }
 
-export async function getAccountPaymentStatus(accountId: string) {
+export async function getAccountPaymentStatus(accountId: string): Promise<any> {
     // Intercept Demo
     if (accountId === DEMO_ACCOUNT_ID) {
         return getDemoPaymentStatus()
