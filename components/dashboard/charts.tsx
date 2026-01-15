@@ -95,7 +95,8 @@ export function PerformanceChart({
                                 tickFormatter={(val) => {
                                     // Find a metric on the left axis to use its formatter
                                     const metric = metrics.find(m => !isRightAxis(m))
-                                    return metric?.formatter ? metric.formatter(val) : (val >= 1000 ? `${val / 1000}k` : val)
+                                    const safeVal = (val === undefined || val === null) ? 0 : val
+                                    return metric?.formatter ? metric.formatter(safeVal) : (safeVal >= 1000 ? `${safeVal / 1000}k` : safeVal)
                                 }}
                                 width={60}
                             />
@@ -111,7 +112,8 @@ export function PerformanceChart({
                                     axisLine={false}
                                     tickFormatter={(val) => {
                                         const metric = metrics.find(isRightAxis)
-                                        return metric?.formatter ? metric.formatter(val) : `${val}`
+                                        const safeVal = (val === undefined || val === null) ? 0 : val
+                                        return metric?.formatter ? metric.formatter(safeVal) : `${safeVal}`
                                     }}
                                     width={40}
                                 />
@@ -133,7 +135,8 @@ export function PerformanceChart({
                                 formatter={(value: any, name: any) => {
                                     // Find metric config by label (name)
                                     const metric = metrics.find(m => m.label === name)
-                                    const formatted = metric?.formatter ? metric.formatter(value) : value
+                                    const safeVal = (value === undefined || value === null) ? 0 : value
+                                    const formatted = metric?.formatter ? metric.formatter(safeVal) : safeVal
                                     return [formatted, name]
                                 }}
                             />
