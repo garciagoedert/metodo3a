@@ -285,11 +285,12 @@ export function DashboardInteractiveBoard({ insights, daily, distribution, topCr
                             {performanceMetrics.map(key => {
                                 const config = METRIC_CONFIG[key] || { label: key, color: '#000', prefix: '' }
                                 const val = getMetricValue(key)
+                                const isNull = val === undefined || val === null
                                 return (
                                     <MetricCard
                                         key={key}
                                         title={config.label}
-                                        value={config.formatter ? config.formatter(val) : val.toLocaleString('pt-BR')}
+                                        value={isNull ? '-' : (config.formatter ? config.formatter(val) : val.toLocaleString('pt-BR'))}
                                         icon={config.icon || MousePointer2}
                                         isActive={selectedMetrics.includes(key)}
                                         activeColor={config.color}
