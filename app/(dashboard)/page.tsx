@@ -12,30 +12,11 @@ export default async function DashboardPage(props: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const searchParams = await props.searchParams
+
   const dateRange = (searchParams.from && searchParams.to)
     ? { from: searchParams.from as string, to: searchParams.to as string }
     : undefined
   const accountIdParam = searchParams.account as string | undefined
-
-  const [data, accounts] = await Promise.all([
-    getDashboardData(dateRange, accountIdParam),
-    getConnectedAccounts()
-  ])
-
-
-  // Determine Active Account ID properly
-  const activeAccount = accountIdParam
-    ? accounts.find((a: any) => a.provider_account_id === accountIdParam)
-    : accounts[0]
-
-  const activeAccountId = activeAccount?.provider_account_id
-
-  // Calculate Month Key for Manual Metrics (YYYY-MM-01)
-  // We use the 'from' date of the range to determine the 'Month' context
-  const fromDate = dateRange ? new Date(dateRange.from) : new Date(new Date().setDate(new Date().getDate() - 30))
-  const monthStart = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}-01`
-
-  // Manual Metrics are now fetched within getDashboardData to support ranges
 
   // Calculate Date Objects for Header (Hydration Fix)
   const today = new Date()
@@ -50,6 +31,27 @@ export default async function DashboardPage(props: {
       to: new Date(new Date(dateRange.to).setHours(0, 0, 0, 0))
     }
     : { from: thirtyDaysAgo, to: today }
+
+  const [data, accounts] = await Promise.all([
+    getDashboardData(dateRange, accountIdParam),
+    getConnectedAccounts()
+  ])
+
+  // Determine Active Account ID properly
+  const activeAccount = accountIdParam
+    ? accounts.find((a: any) => a.provider_account_id === accountIdParam)
+    : accounts[0]
+
+  const activeAccountId = activeAccount?.provider_account_id
+
+
+
+  // Calculate Month Key for Manual Metrics (YYYY-MM-01)
+  // We use the 'from' date of the range to determine the 'Month' context
+  const fromDate = dateRange ? new Date(dateRange.from) : new Date(new Date().setDate(new Date().getDate() - 30))
+  const monthStart = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}-01`
+
+  // Manual Metrics are now fetched within getDashboardData to support ranges
 
   // Handle loading/error states simply for now
   if ('error' in data) {

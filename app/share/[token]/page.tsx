@@ -38,9 +38,34 @@ export default async function PublicSharePage(props: {
     }
 
     // Parse Date Range
-    const dateRange = (searchParams.from && searchParams.to)
-        ? { from: searchParams.from as string, to: searchParams.to as string }
-        : undefined
+    // Parse Date Range or Default to Current Month
+    let fromDate: Date
+    let toDate: Date
+
+    if (searchParams.from && searchParams.to) {
+        // Parse manually to avoid timezone shift
+        const [y, m, d] = (searchParams.from as string).split('-').map(Number)
+        fromDate = new Date(y, m - 1, d)
+
+        const [y2, m2, d2] = (searchParams.to as string).split('-').map(Number)
+        toDate = new Date(y2, m2 - 1, d2)
+    } else {
+        // Default to PREVIOUS MONTH (Completed)
+        const now = new Date()
+        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+
+        fromDate = lastMonth
+        toDate = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0)
+    }
+
+    // Format for API
+    const dateRange = {
+        from: `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}-${String(fromDate.getDate()).padStart(2, '0')}`,
+        to: `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, '0')}-${String(toDate.getDate()).padStart(2, '0')}`
+    }
+
+    // Context for Monthly Analysis
+    const monthStart = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}-01`
 
     // Fetch Data (Bypass Auth Check inside getPublicDashboardData, but we know user status here)
     const data = await getPublicDashboardData(token, dateRange)
@@ -72,17 +97,7 @@ export default async function PublicSharePage(props: {
         appointments_showed: funnelData.showed
     }
 
-    // Calculate Month Key for Manual Metrics (YYYY-MM-01) - Context only
-    let fromDate: Date
-    if (dateRange) {
-        // Parse manually to avoid timezone shift (Server running locally)
-        const [y, m, d] = dateRange.from.split('-').map(Number)
-        fromDate = new Date(y, m - 1, d) // Local date
-    } else {
-        fromDate = new Date()
-        fromDate.setDate(fromDate.getDate() - 30)
-    }
-    const monthStart = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}-01`
+
 
     return (
         <div className="flex min-h-screen flex-col bg-slate-50/50">

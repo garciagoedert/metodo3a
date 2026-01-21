@@ -347,6 +347,16 @@ export function DashboardInteractiveBoard({ insights, daily, distribution, topCr
                                 icon={Users}
                                 className="py-3 min-w-[150px] snap-center md:min-w-0"
                             />
+                            <MetricCard
+                                title="Custo por Conversa"
+                                value={`R$ ${(function () {
+                                    const spend = insights?.spend || 0;
+                                    const convs = conversasValue || 0;
+                                    return convs > 0 ? (spend / convs).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00';
+                                })()}`}
+                                icon={MessageSquare}
+                                className="py-3 min-w-[150px] snap-center md:min-w-0"
+                            />
                             {manualMetrics?.appointments_scheduled > 0 && (
                                 <MetricCard
                                     title="CPA (Agendamento)"

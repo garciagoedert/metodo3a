@@ -600,6 +600,8 @@ export class MetaApiService {
         const res = await this.fetch('insights', params)
         const apiData = res.data || []
 
+
+
         const toUpsert = apiData
             .filter((d: any) => d.date_start < todayStr)
             .map((d: any) => {
@@ -672,6 +674,163 @@ export class MetaApiService {
 
     public async debugFetch(fields: string) {
         return await this.fetch('', { fields }, false)
+    }
+
+    /**
+     * Get Overview of All Campaigns (Active/Stopped) for Monitoring
+     */
+    async getCampaignOverview(): Promise<any[]> {
+        const params = {
+            fields: 'id,name,status,effective_status,daily_budget,lifetime_budget,budget_remaining,buying_type,objective,issues_info,start_time,stop_time',
+            limit: '500'
+        }
+        try {
+            const res = await this.fetch('campaigns', params)
+            return res.data || []
+        } catch (e) {
+            console.error("Failed to fetch campaign overview", e)
+            return []
+        }
+    }
+
+    async getAccountHealth(dateRange: { since: string, until: string }) {
+        try {
+            const [details, insights, campaigns] = await Promise.all([
+                this.getAccountDetails(),
+                this.fetch('insights', {
+                    time_range: JSON.stringify(dateRange),
+                    level: 'account',
+                    fields: 'spend,purchase_roas,cpc,actions'
+                }).then(r => r.data?.[0] || {}),
+                this.fetch('campaigns', {
+                    fields: 'effective_status,issues_info,budget_remaining',
+                    limit: '500'
+                }).then(r => r.data || [])
+            ])
+
+            const activeCampaigns = campaigns.filter((c: any) => c.effective_status === 'ACTIVE')
+            const stoppedCampaigns = campaigns.filter((c: any) => c.effective_status !== 'ACTIVE')
+            const issues = campaigns.filter((c: any) => c.issues_info && c.issues_info.length > 0).length
+            const noBalance = campaigns.filter((c: any) => c.budget_remaining && parseFloat(c.budget_remaining) < 100).length
+
+            const actions = insights.actions || []
+            const conversations = actions.filter((a: any) => a.action_type.startsWith('onsite_conversion.messaging_conversation_started'))
+                .reduce((acc: number, item: any) => acc + parseInt(item.value), 0)
+
+            return {
+                balance: details.balance,
+                currency: details.currency,
+                account_status: details.status,
+                disable_reason: details.disable_reason,
+                spend: parseFloat(insights.spend || 0),
+                cpc: parseFloat(insights.cpc || 0),
+                conversations: conversations,
+                active_count: activeCampaigns.length,
+                stopped_count: stoppedCampaigns.length,
+                no_balance_count: noBalance,
+                total_issues: issues
+            }
+
+        } catch (e) {
+            console.error("Health Check Failed", e)
+            return null
+        }
+    }
+
+    /**
+     * Get Daily Insights for all Ads (Monitoring View)
+     */
+    async getAdDailyInsights(dateRange: { since: string, until: string }): Promise<any[]> {
+        const params: any = {
+            level: 'ad',
+            time_increment: '1',
+            fields: 'ad_id,ad_name,campaign_name,adset_name,spend,impressions,clicks,cpc,ctr,frequency,actions,objective,reach,video_play_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_thruplay_watched_actions',
+            limit: '1000'
+        }
+
+        if (dateRange) {
+            params.time_range = JSON.stringify(dateRange)
+        }
+
+        try {
+            // 1. Fetch Insights
+            const data = await this.fetch('insights', params)
+            const raw = data.data || []
+
+            if (raw.length === 0) return []
+
+            // 2. Fetch Ad Names/Creatives/Status (Insights doesn't always show current status or image)
+            // We need 'effective_status' and 'creative.thumbnail_url'
+            const uniqueAdIds = Array.from(new Set(raw.map((r: any) => r.ad_id))) as string[]
+
+            const adInfoMap = new Map<string, any>()
+
+            // Batch fetch ad info (chunk by 50)
+            const chunkSize = 50
+            for (let i = 0; i < uniqueAdIds.length; i += chunkSize) {
+                const chunk = uniqueAdIds.slice(i, i + chunkSize)
+                const adParams = {
+                    ids: chunk.join(','),
+                    fields: 'name,status,effective_status,quality_ranking,engagement_rate_ranking,conversion_rate_ranking,creative{thumbnail_url,image_url,title,object_story_spec}'
+                }
+                try {
+                    const adData = await this.fetch('', adParams, true)
+                    Object.values(adData).forEach((ad: any) => {
+                        let imageUrl = ad.creative?.image_url || ad.creative?.thumbnail_url
+                        if (!imageUrl && ad.creative?.object_story_spec) {
+                            const spec = ad.creative.object_story_spec
+                            if (spec.video_data) imageUrl = spec.video_data.image_url
+                            if (spec.link_data) imageUrl = spec.link_data.picture
+                            if (spec.link_data?.child_attachments?.[0]) imageUrl = spec.link_data.child_attachments[0].picture
+                        }
+                        adInfoMap.set(ad.id, { ...ad, image_url: imageUrl })
+                    })
+                } catch (innerErr) {
+                    console.error("Failed to fetch creative details chunk", innerErr)
+                }
+            }
+
+            // 3. Merge
+            return raw.map((item: any) => {
+                const adInfo = adInfoMap.get(item.ad_id)
+                const actions = item.actions || []
+                const conversions = actions.filter((a: any) => a.action_type.startsWith('onsite_conversion.messaging_conversation_started'))
+                    .reduce((acc: number, x: any) => acc + parseInt(x.value), 0)
+
+                return {
+                    ad_id: item.ad_id,
+                    ad_name: item.ad_name,
+                    date: item.date_start,
+                    status: adInfo?.effective_status || 'UNKNOWN',
+                    image_url: adInfo?.image_url || null,
+                    metrics: {
+                        spend: parseFloat(item.spend || 0),
+                        impressions: parseInt(item.impressions || 0),
+                        clicks: parseInt(item.clicks || 0),
+                        reach: parseInt(item.reach || 0),
+                        ctr: parseFloat(item.ctr || 0),
+                        cpc: parseFloat(item.cpc || 0),
+                        frequency: parseFloat(item.frequency || 0),
+                        conversations: conversions,
+                        video_3s: (item.video_play_actions || []).find((x: any) => x.action_type === 'video_view')?.value || 0,
+                        video_p25: (item.video_p25_watched_actions || []).find((x: any) => x.action_type === 'video_view')?.value || 0,
+                        video_p50: (item.video_p50_watched_actions || []).find((x: any) => x.action_type === 'video_view')?.value || 0,
+                        video_p75: (item.video_p75_watched_actions || []).find((x: any) => x.action_type === 'video_view')?.value || 0,
+                        video_p100: (item.video_p100_watched_actions || []).find((x: any) => x.action_type === 'video_view')?.value || 0,
+                        video_thruplay: (item.video_thruplay_watched_actions || []).find((x: any) => x.action_type === 'video_view')?.value || 0,
+                    },
+                    quality: {
+                        quality_ranking: adInfo?.quality_ranking || 'UNKNOWN',
+                        engagement_rate_ranking: adInfo?.engagement_rate_ranking || 'UNKNOWN',
+                        conversion_rate_ranking: adInfo?.conversion_rate_ranking || 'UNKNOWN'
+                    }
+                }
+            })
+
+        } catch (e) {
+            console.error("Meta API Failed (getAdDailyInsights):", e)
+            return []
+        }
     }
 
     /**

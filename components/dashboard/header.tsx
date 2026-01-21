@@ -11,14 +11,26 @@ import { useUserRole } from "@/hooks/use-user-role"
 import { toast } from "sonner"
 import { getPublicLink } from "./share-actions"
 import { PaymentStatus } from "./payment-status"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
-export function Header({ dateRange, accounts = [], currentAccountId }: {
+export function Header({ dateRange, accounts = [], currentAccountId, currentView }: {
     dateRange?: { from: Date, to: Date },
     accounts?: { provider_account_id: string, name: string }[],
-    currentAccountId?: string
+    currentAccountId?: string,
+    currentView?: string
 }) {
     const { role } = useUserRole()
     const [isCopied, setIsCopied] = React.useState(false)
+    const router = useRouter()
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
+
+    const handleViewChange = (value: string) => {
+        const params = new URLSearchParams(searchParams?.toString())
+        params.set('view', value)
+        router.push(`${pathname}?${params.toString()}`)
+    }
 
     const handleShare = async (mode: 'copy' | 'open') => {
         if (!currentAccountId) {
@@ -48,33 +60,49 @@ export function Header({ dateRange, accounts = [], currentAccountId }: {
     return (
         <header className="sticky top-0 z-40 w-full flex flex-col md:flex-row h-auto md:h-16 items-start md:items-center justify-between border-b bg-background px-6 py-4 md:py-0 gap-4 md:gap-0 shadow-sm">
             <div className="flex w-full md:w-auto items-center justify-between gap-4">
-                <ClientSelector className="w-auto flex-1 md:w-[400px]" accounts={accounts} currentAccountId={currentAccountId} />
-                <PaymentStatus accountId={currentAccountId} />
+                {(!currentView || currentView === 'deep_dive') && (
+                    <>
+                        <ClientSelector className="w-auto flex-1 md:w-[400px]" accounts={accounts} currentAccountId={currentAccountId} />
+                        <PaymentStatus accountId={currentAccountId} />
+                    </>
+                )}
+
+                {currentView && (
+                    <Tabs value={currentView} onValueChange={handleViewChange} className="w-auto">
+                        <TabsList>
+                            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+                            <TabsTrigger value="deep_dive">Análise Aprofundada</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                )}
             </div>
 
-
             <div className="flex w-full md:w-auto flex-col md:flex-row items-stretch md:items-center gap-4">
-                <DateRangePicker className="w-full md:w-auto" initialDate={dateRange} />
+                {(!currentView || currentView === 'deep_dive') && (
+                    <DateRangePicker className="w-full md:w-auto" initialDate={dateRange} />
+                )}
 
-                <div className="flex w-full md:w-auto items-center gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 md:flex-none gap-2"
-                        onClick={() => handleShare('copy')}
-                    >
-                        {isCopied ? <Check className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}
-                        <span className="whitespace-nowrap">{isCopied ? "Copiado!" : "Copiar Link"}</span>
-                    </Button>
-                    <Button
-                        size="sm"
-                        className="flex-1 md:flex-none gap-2 bg-blue-600 hover:bg-blue-700"
-                        onClick={() => handleShare('open')}
-                    >
-                        <ExternalLink className="h-4 w-4" />
-                        <span className="whitespace-nowrap">Área do Cliente</span>
-                    </Button>
-                </div>
+                {currentView !== 'overview' && (
+                    <div className="flex w-full md:w-auto items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 md:flex-none gap-2"
+                            onClick={() => handleShare('copy')}
+                        >
+                            {isCopied ? <Check className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}
+                            <span className="whitespace-nowrap">{isCopied ? "Copiado!" : "Copiar Link"}</span>
+                        </Button>
+                        <Button
+                            size="sm"
+                            className="flex-1 md:flex-none gap-2 bg-blue-600 hover:bg-blue-700"
+                            onClick={() => handleShare('open')}
+                        >
+                            <ExternalLink className="h-4 w-4" />
+                            <span className="whitespace-nowrap">Área do Cliente</span>
+                        </Button>
+                    </div>
+                )}
             </div>
         </header>
     )

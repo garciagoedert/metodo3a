@@ -3,7 +3,7 @@
 import { createMetaService } from "@/lib/meta-api/service"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { differenceInDays, getDaysInMonth, startOfMonth, endOfMonth, max, min, parseISO, isSameMonth, format, addMonths, isBefore, isAfter } from "date-fns"
+import { differenceInDays, getDaysInMonth, startOfMonth, endOfMonth, max, min, parseISO, isSameMonth, format, addMonths, isBefore, isAfter, subDays, subWeeks, subMonths } from "date-fns"
 import { getDemoData, getDemoPaymentStatus, getDemoGoalsProgress, DEMO_ACCOUNT_ID, DEMO_DB_ID, DEMO_PUBLIC_TOKEN } from "@/lib/demo-data"
 
 // Helper to get all connected accounts for the selector
@@ -533,4 +533,72 @@ export async function getAccountPaymentStatus(accountId: string): Promise<any> {
     const service = await createMetaService(accountId)
     if (!service) return null
     return await service.getAccountDetails()
+}
+
+export async function getAdMonitoringData(accountId: string, anchorDate: string, periodType: string, count: number) {
+    const service = await createMetaService(accountId)
+    if (!service) return { error: "Conta não conectada" }
+
+    const anchor = parseISO(anchorDate)
+    let startDate = anchor
+
+    // Calculate Start Date
+    // We want 'count' periods ENDING on 'anchorDate'.
+    // Daily: 1 period = 1 day.
+    // Weekly: 1 period = 7 days.
+    // Biweekly: 1 period = 15 days.
+    // Monthly: 1 period = 30 days (approx).
+
+    let daysToSubtract = 0
+
+    if (periodType === 'daily') {
+        daysToSubtract = count - 1
+    } else if (periodType === 'weekly') {
+        daysToSubtract = (count * 7) - 1
+    } else if (periodType === 'biweekly') {
+        daysToSubtract = (count * 15) - 1
+    } else if (periodType === 'monthly') {
+        daysToSubtract = (count * 30) - 1
+    }
+
+    startDate = subDays(anchor, Math.max(0, daysToSubtract))
+
+    const range = {
+        since: format(startDate, 'yyyy-MM-dd'),
+        until: format(anchor, 'yyyy-MM-dd')
+    }
+
+    // console.log(`Monitoring Fetch: ${range.since} to ${range.until} (${periodType} x ${count})`)
+
+    const data = await service.getAdDailyInsights(range)
+    return { data, range }
+}
+
+export async function getMonitoringOverviewAction(accountId: string) {
+    const service = await createMetaService(accountId)
+    if (!service) return { error: "Conta não conectada" }
+
+    const campaigns = await service.getCampaignOverview()
+    return { campaigns }
+}
+
+export async function getGlobalMonitoringAction(dateRange: { from: string, to: string }) {
+    const accounts = await getConnectedAccounts()
+
+    // Fetch health for all accounts
+    const healths = await Promise.all(accounts.map(async (acc) => {
+        const service = await createMetaService(acc.provider_account_id)
+        if (!service) return { id: acc.provider_account_id, name: acc.name, error: "Connection Lost" }
+
+        const health = await service.getAccountHealth({ since: dateRange.from, until: dateRange.to })
+        return {
+            id: acc.provider_account_id,
+            name: acc.name,
+            avatar: null, // Could fetch avatar
+            provider_account_id: acc.provider_account_id, // keep ID
+            ...health
+        }
+    }))
+
+    return healths
 }
