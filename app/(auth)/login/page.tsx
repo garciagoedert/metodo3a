@@ -11,7 +11,10 @@ export default async function LoginPage() {
     const admin = createAdminClient()
 
     // 1. Fetch Auth Users
-    const { data: { users } } = await admin.auth.admin.listUsers()
+    const { data: { users } } = await admin.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000
+    })
 
     // 2. Fetch Profiles to check for deleted status
     // Use admin client to bypass RLS if necessary, though public.profiles might be readable.
