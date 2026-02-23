@@ -529,6 +529,10 @@ export class MetaApiService {
                     if (spec.link_data?.child_attachments?.[0]) imageUrl = spec.link_data.child_attachments[0].picture
                 }
 
+                // Logic for Permalink
+                // Fallback to the ad's shareable preview node (requires fetching from the ad node, but we'll try to build a direct manager link)
+                let permalink = `https://business.facebook.com/adsmanager/manage/ads?act=${this.accountId.replace('act_', '')}&filter_set.0.filter_field=ad.id&filter_set.0.filter_value=${insight.ad_id}`
+
                 const actions = insight.actions || []
                 const profileVisits = actions.find((a: any) => a.action_type === 'instagram_profile_visits')?.value || '0'
                 const conversations = actions.filter((a: any) => a.action_type.startsWith('onsite_conversion.messaging_conversation_started'))
@@ -538,6 +542,7 @@ export class MetaApiService {
                     id: insight.ad_id,
                     name: insight.ad_name,
                     image_url: imageUrl || null,
+                    permalink: permalink,
                     metrics: {
                         spend: parseFloat(insight.spend || '0'),
                         impressions: parseInt(insight.impressions || '0'),

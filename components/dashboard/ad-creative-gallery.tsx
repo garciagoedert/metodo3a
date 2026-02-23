@@ -24,16 +24,18 @@ interface AdCreative {
     id: string
     name: string
     image_url: string | null // Now nullable
+    permalink?: string | null
     metrics: AdMetrics
 }
 
 interface AdCreativeGalleryProps {
     ads: AdCreative[]
+    disableLinks?: boolean
 }
 
 type SortMetric = 'results' | 'spend' | 'impressions' | 'clicks' | 'ctr' | 'profile_visits' | 'reach' | 'cpc' | 'frequency' | 'conversations'
 
-export function AdCreativeGallery({ ads }: AdCreativeGalleryProps) {
+export function AdCreativeGallery({ ads, disableLinks = false }: AdCreativeGalleryProps) {
     const [sortBy, setSortBy] = useState<SortMetric>('spend')
 
     const sortedAds = [...ads].sort((a, b) => {
@@ -122,31 +124,66 @@ export function AdCreativeGallery({ ads }: AdCreativeGalleryProps) {
                     return (
                         <Card
                             key={ad.id}
-                            className="p-0 gap-0 overflow-hidden hover:shadow-lg transition-all duration-300 group border flex flex-col"
+                            className="p-0 gap-0 overflow-hidden hover:shadow-lg transition-all duration-300 group border flex flex-col relative"
                         >
                             {/* Image Header - Full Bleed */}
-                            <div className="relative aspect-square w-full bg-slate-100 dark:bg-slate-900 border-b overflow-hidden shrink-0">
-                                {ad.image_url ? (
-                                    <img
-                                        src={ad.image_url}
-                                        alt={ad.name}
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                        loading="lazy"
-                                    />
-                                ) : (
-                                    <div className="flex items-center justify-center w-full h-full text-slate-400">
-                                        <ImageOff className="h-12 w-12" />
+                            {ad.permalink && !disableLinks ? (
+                                <a
+                                    href={ad.permalink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="relative aspect-square w-full bg-slate-100 dark:bg-slate-900 border-b overflow-hidden shrink-0 block cursor-pointer group/image"
+                                >
+                                    {ad.image_url ? (
+                                        <img
+                                            src={ad.image_url}
+                                            alt={ad.name}
+                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                            loading="lazy"
+                                        />
+                                    ) : (
+                                        <div className="flex items-center justify-center w-full h-full text-slate-400">
+                                            <ImageOff className="h-12 w-12" />
+                                        </div>
+                                    )}
+                                    {/* Overlay Icon */}
+                                    <div className="absolute inset-0 bg-black/0 group-hover/image:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover/image:opacity-100">
+                                        <ExternalLink className="text-white h-8 w-8 drop-shadow-lg" />
                                     </div>
-                                )}
-                                <div className="absolute top-0 left-0 z-10">
-                                    <Badge
-                                        className="text-white font-bold text-base px-3 py-1 shadow-md border-0 rounded-none rounded-br-lg"
-                                        style={{ backgroundColor: activeColor }}
-                                    >
-                                        #{index + 1}
-                                    </Badge>
+
+                                    <div className="absolute top-0 left-0 z-10 pointer-events-none">
+                                        <Badge
+                                            className="text-white font-bold text-base px-3 py-1 shadow-md border-0 rounded-none rounded-br-lg"
+                                            style={{ backgroundColor: activeColor }}
+                                        >
+                                            #{index + 1}
+                                        </Badge>
+                                    </div>
+                                </a>
+                            ) : (
+                                <div className="relative aspect-square w-full bg-slate-100 dark:bg-slate-900 border-b overflow-hidden shrink-0">
+                                    {ad.image_url ? (
+                                        <img
+                                            src={ad.image_url}
+                                            alt={ad.name}
+                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                            loading="lazy"
+                                        />
+                                    ) : (
+                                        <div className="flex items-center justify-center w-full h-full text-slate-400">
+                                            <ImageOff className="h-12 w-12" />
+                                        </div>
+                                    )}
+                                    <div className="absolute top-0 left-0 z-10">
+                                        <Badge
+                                            className="text-white font-bold text-base px-3 py-1 shadow-md border-0 rounded-none rounded-br-lg"
+                                            style={{ backgroundColor: activeColor }}
+                                        >
+                                            #{index + 1}
+                                        </Badge>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             {/* Metrics Body */}
                             <CardContent className="p-4 space-y-3 flex-1">
