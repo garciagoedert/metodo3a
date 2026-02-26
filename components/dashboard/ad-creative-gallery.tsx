@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Eye, MousePointer2, ExternalLink, BarChart3, TrendingUp, DollarSign, ImageOff, MessageCircle, Repeat, Coins, Users, LayoutGrid } from 'lucide-react'
 import Image from 'next/image'
 import { METRIC_CONFIG } from './interactive-board'
+import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog"
+import { AdPreviewLoader } from "@/components/dashboard/ad-preview-loader"
 
 interface AdMetrics {
     spend: number
@@ -31,11 +33,12 @@ interface AdCreative {
 interface AdCreativeGalleryProps {
     ads: AdCreative[]
     disableLinks?: boolean
+    accountId?: string
 }
 
 type SortMetric = 'results' | 'spend' | 'impressions' | 'clicks' | 'ctr' | 'profile_visits' | 'reach' | 'cpc' | 'frequency' | 'conversations'
 
-export function AdCreativeGallery({ ads, disableLinks = false }: AdCreativeGalleryProps) {
+export function AdCreativeGallery({ ads, disableLinks = false, accountId }: AdCreativeGalleryProps) {
     const [sortBy, setSortBy] = useState<SortMetric>('spend')
 
     const sortedAds = [...ads].sort((a, b) => {
@@ -127,7 +130,45 @@ export function AdCreativeGallery({ ads, disableLinks = false }: AdCreativeGalle
                             className="p-0 gap-0 overflow-hidden hover:shadow-lg transition-all duration-300 group border flex flex-col relative"
                         >
                             {/* Image Header - Full Bleed */}
-                            {ad.permalink && !disableLinks ? (
+                            {accountId && !disableLinks ? (
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <div
+                                            className="relative aspect-square w-full bg-slate-100 dark:bg-slate-900 border-b overflow-hidden shrink-0 block cursor-pointer group/image"
+                                        >
+                                            {ad.image_url ? (
+                                                <img
+                                                    src={ad.image_url}
+                                                    alt={ad.name}
+                                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                                    loading="lazy"
+                                                />
+                                            ) : (
+                                                <div className="flex items-center justify-center w-full h-full text-slate-400">
+                                                    <ImageOff className="h-12 w-12" />
+                                                </div>
+                                            )}
+                                            {/* Overlay Icon */}
+                                            <div className="absolute inset-0 bg-black/0 group-hover/image:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover/image:opacity-100">
+                                                <ExternalLink className="text-white h-8 w-8 drop-shadow-lg" />
+                                            </div>
+
+                                            <div className="absolute top-0 left-0 z-10 pointer-events-none">
+                                                <Badge
+                                                    className="text-white font-bold text-base px-3 py-1 shadow-md border-0 rounded-none rounded-br-lg"
+                                                    style={{ backgroundColor: activeColor }}
+                                                >
+                                                    #{index + 1}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden bg-transparent border-none shadow-none">
+                                        <DialogTitle className="sr-only">Visualizar Anúncio {ad.name}</DialogTitle>
+                                        <AdPreviewLoader accountId={accountId} adId={ad.id} fallbackImage={ad.image_url} />
+                                    </DialogContent>
+                                </Dialog>
+                            ) : ad.permalink && !disableLinks ? (
                                 <a
                                     href={ad.permalink}
                                     target="_blank"
@@ -188,7 +229,19 @@ export function AdCreativeGallery({ ads, disableLinks = false }: AdCreativeGalle
                             {/* Metrics Body */}
                             <CardContent className="p-4 space-y-3 flex-1">
                                 <h4 className="font-semibold text-sm line-clamp-1 min-h-[20px] title={ad.name}">
-                                    {ad.name}
+                                    {accountId && !disableLinks ? (
+                                        <a
+                                            href={`https://adsmanager.facebook.com/adsmanager/manage/ads?act=${accountId.replace('act_', '')}&selected_ad_ids=${ad.id}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="hover:underline hover:text-blue-600 transition-colors cursor-pointer"
+                                            title="Abrir no Gerenciador de Anúncios"
+                                        >
+                                            {ad.name}
+                                        </a>
+                                    ) : (
+                                        ad.name
+                                    )}
                                 </h4>
 
                                 <div className="grid grid-cols-2 gap-x-2 gap-y-3 text-sm">

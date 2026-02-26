@@ -79,7 +79,7 @@ export class MetaApiService {
         return dateRange
     }
 
-    private async fetch(endpoint: string, params: Record<string, string> = {}, useRoot = false) {
+    private async fetch(endpoint: string, params: Record<string, string> = {}, useRoot = false, fetchOptions: RequestInit = { next: { revalidate: 300 } }) {
         const queryParams = new URLSearchParams({
             access_token: this.accessToken,
             ...params
@@ -92,7 +92,7 @@ export class MetaApiService {
             ? `${baseUrl}/${endpoint}?${queryParams.toString()}`
             : `${baseUrl}?${queryParams.toString()}`
 
-        const response = await fetch(url, { next: { revalidate: 300 } }) // Cache for 5min/300s
+        const response = await fetch(url, fetchOptions)
         if (!response.ok) {
             const errorData = await response.json()
             throw new Error(errorData.error?.message || `Meta API Error: ${response.statusText}`)
@@ -700,7 +700,11 @@ export class MetaApiService {
 
     async getAccountHealth(dateRange: { since: string, until: string }) {
         try {
-            const [details, insights, campaigns] = await Promise.all([
+            const endDate = new Date(dateRange.until + 'T12:00:00Z')
+            const startDate = new Date(dateRange.until + 'T12:00:00Z')
+            startDate.setDate(endDate.getDate() - 3)
+
+            const [details, insights, campaigns, campaignDailyData] = await Promise.all([
                 this.getAccountDetails(),
                 this.fetch('insights', {
                     time_range: JSON.stringify(dateRange),
@@ -708,15 +712,61 @@ export class MetaApiService {
                     fields: 'spend,purchase_roas,cpc,actions'
                 }).then(r => r.data?.[0] || {}),
                 this.fetch('campaigns', {
-                    fields: 'effective_status,issues_info,budget_remaining',
+                    fields: 'effective_status,issues_info,budget_remaining,lifetime_budget',
                     limit: '500'
+                }).then(r => r.data || []),
+                this.fetch('insights', {
+                    time_range: JSON.stringify({ since: startDate.toISOString().split('T')[0], until: dateRange.until }),
+                    level: 'campaign',
+                    time_increment: '1',
+                    fields: 'campaign_id,spend,cpc,actions'
                 }).then(r => r.data || [])
             ])
 
             const activeCampaigns = campaigns.filter((c: any) => c.effective_status === 'ACTIVE')
             const stoppedCampaigns = campaigns.filter((c: any) => c.effective_status !== 'ACTIVE')
             const issues = campaigns.filter((c: any) => c.issues_info && c.issues_info.length > 0).length
-            const noBalance = campaigns.filter((c: any) => c.budget_remaining && parseFloat(c.budget_remaining) < 100).length
+
+            // --- Deep Analysis Baseline (3-day vs Today) ---
+            let decayingCampaigns = 0;
+            const campaignStats = new Map();
+            for (const row of campaignDailyData) {
+                if (!campaignStats.has(row.campaign_id)) campaignStats.set(row.campaign_id, { today: null, past: [] });
+                const stats = campaignStats.get(row.campaign_id);
+                if (row.date_start === dateRange.until) {
+                    stats.today = row;
+                } else {
+                    stats.past.push(row);
+                }
+            }
+
+            for (const [id, stats] of campaignStats.entries()) {
+                if (!stats.today || stats.past.length === 0) continue;
+
+                const spendToday = parseFloat(stats.today.spend || '0');
+                if (spendToday < 30) continue; // Noise filter
+
+                let totalPastCpc = 0;
+                let pastDaysWithData = 0;
+
+                for (const pastRow of stats.past) {
+                    const cpc = parseFloat(pastRow.cpc || '0');
+                    if (cpc > 0) {
+                        totalPastCpc += cpc;
+                        pastDaysWithData++;
+                    }
+                }
+
+                if (pastDaysWithData === 0) continue;
+                const avgPastCpc = totalPastCpc / pastDaysWithData;
+                const todayCpc = parseFloat(stats.today.cpc || '0');
+
+                // Alert if CPC today is > 30% higher than the 3-day baseline average
+                if (todayCpc > (avgPastCpc * 1.3)) {
+                    decayingCampaigns++;
+                }
+            }
+            // ------------------------------------------------
 
             const actions = insights.actions || []
             const conversations = actions.filter((a: any) => a.action_type.startsWith('onsite_conversion.messaging_conversation_started'))
@@ -727,13 +777,14 @@ export class MetaApiService {
                 currency: details.currency,
                 account_status: details.status,
                 disable_reason: details.disable_reason,
+                is_prepay_account: details.is_prepay_account,
                 spend: parseFloat(insights.spend || 0),
                 cpc: parseFloat(insights.cpc || 0),
                 conversations: conversations,
                 active_count: activeCampaigns.length,
                 stopped_count: stoppedCampaigns.length,
-                no_balance_count: noBalance,
-                total_issues: issues
+                total_issues: issues,
+                decaying_campaigns: decayingCampaigns
             }
 
         } catch (e) {
@@ -776,19 +827,25 @@ export class MetaApiService {
                 const chunk = uniqueAdIds.slice(i, i + chunkSize)
                 const adParams = {
                     ids: chunk.join(','),
-                    fields: 'name,status,effective_status,quality_ranking,engagement_rate_ranking,conversion_rate_ranking,creative{thumbnail_url,image_url,title,object_story_spec}'
+                    fields: 'name,status,effective_status,creative{thumbnail_url,image_url,title,object_story_spec}'
                 }
                 try {
                     const adData = await this.fetch('', adParams, true)
-                    Object.values(adData).forEach((ad: any) => {
-                        let imageUrl = ad.creative?.image_url || ad.creative?.thumbnail_url
-                        if (!imageUrl && ad.creative?.object_story_spec) {
-                            const spec = ad.creative.object_story_spec
-                            if (spec.video_data) imageUrl = spec.video_data.image_url
-                            if (spec.link_data) imageUrl = spec.link_data.picture
-                            if (spec.link_data?.child_attachments?.[0]) imageUrl = spec.link_data.child_attachments[0].picture
+                    Object.entries(adData).forEach(([adId, ad]: [string, any]) => {
+                        let imageUrl = null
+                        // Meta API sometimes returns creative as an array or object
+                        const creativeData = Array.isArray(ad.creative?.data) ? ad.creative.data[0] : ad.creative
+
+                        if (creativeData) {
+                            imageUrl = creativeData.image_url || creativeData.thumbnail_url
+                            if (!imageUrl && creativeData.object_story_spec) {
+                                const spec = creativeData.object_story_spec
+                                if (spec.video_data) imageUrl = spec.video_data.image_url
+                                if (spec.link_data) imageUrl = spec.link_data.picture
+                                if (spec.link_data?.child_attachments?.[0]) imageUrl = spec.link_data.child_attachments[0].picture
+                            }
                         }
-                        adInfoMap.set(ad.id, { ...ad, image_url: imageUrl })
+                        adInfoMap.set(adId, { ...ad, image_url: imageUrl })
                     })
                 } catch (innerErr) {
                     console.error("Failed to fetch creative details chunk", innerErr)
@@ -802,21 +859,26 @@ export class MetaApiService {
                 const conversions = actions.filter((a: any) => a.action_type.startsWith('onsite_conversion.messaging_conversation_started'))
                     .reduce((acc: number, x: any) => acc + parseInt(x.value), 0)
 
+                let permalink = `https://business.facebook.com/adsmanager/manage/ads?act=${this.accountId.replace('act_', '')}&filter_set.0.filter_field=ad.id&filter_set.0.filter_value=${item.ad_id}`
+
                 return {
                     ad_id: item.ad_id,
                     ad_name: item.ad_name,
                     date: item.date_start,
                     status: adInfo?.effective_status || 'UNKNOWN',
                     image_url: adInfo?.image_url || null,
+                    permalink,
                     metrics: {
                         spend: parseFloat(item.spend || 0),
                         impressions: parseInt(item.impressions || 0),
                         clicks: parseInt(item.clicks || 0),
+                        inline_link_clicks: actions.find((x: any) => x.action_type === 'link_click')?.value || 0,
                         reach: parseInt(item.reach || 0),
                         ctr: parseFloat(item.ctr || 0),
                         cpc: parseFloat(item.cpc || 0),
                         frequency: parseFloat(item.frequency || 0),
                         conversations: conversions,
+                        profile_visits: actions.find((x: any) => x.action_type === 'post_engagement')?.value || 0,
                         video_3s: (item.video_play_actions || []).find((x: any) => x.action_type === 'video_view')?.value || 0,
                         video_p25: (item.video_p25_watched_actions || []).find((x: any) => x.action_type === 'video_view')?.value || 0,
                         video_p50: (item.video_p50_watched_actions || []).find((x: any) => x.action_type === 'video_view')?.value || 0,
@@ -835,6 +897,67 @@ export class MetaApiService {
         } catch (e) {
             console.error("Meta API Failed (getAdDailyInsights):", e)
             return []
+        }
+    }
+
+    /**
+     * Get Ad Preview HTML from Meta API
+     */
+    async getAdPreviewHTML(adId: string, format: string = 'INSTAGRAM_STANDARD'): Promise<string | null> {
+        try {
+            const params = { ad_format: format }
+            const response = await this.fetch(`${adId}/previews`, params, true, { cache: 'no-store' })
+            if (response.data && response.data.length > 0) {
+                return response.data[0].body
+            }
+            return null
+        } catch (e) {
+            console.error("Failed to fetch Ad Preview HTML", e)
+            return null
+        }
+    }
+
+    /**
+     * Get Raw Ad Creative Details (Video URL, Image, Text)
+     */
+    async getAdCreativeDetails(adId: string): Promise<any | null> {
+        try {
+            const params = {
+                fields: 'creative{video_id,image_url,body,title,object_story_spec,asset_feed_spec}'
+            }
+            const response = await this.fetch(`${adId}`, params, true, { cache: 'no-store' })
+
+            if (response.creative) {
+                const creativeData = Array.isArray(response.creative.data) ? response.creative.data[0] : response.creative
+                return creativeData
+            }
+            return null
+        } catch (e) {
+            console.error("Failed to fetch Ad Creative Details", e)
+            return null
+        }
+    }
+
+    /**
+     * Fetch raw MP4 source URL for a given video ID
+     */
+    async fetchVideoSource(videoId: string): Promise<string | null> {
+        try {
+            console.log(`[DEBUG] Fetching source for video ID: ${videoId}`)
+            const response = await this.fetch(videoId, { fields: 'source' }, true)
+            console.log(`[DEBUG] Video source response:`, JSON.stringify(response, null, 2))
+
+            try {
+                require('fs').writeFileSync('debug_source.json', JSON.stringify(response, null, 2))
+            } catch (e) { }
+
+            return response.source || null
+        } catch (e: any) {
+            console.error("Failed to fetch native video source url", e)
+            try {
+                require('fs').writeFileSync('debug_error.json', JSON.stringify({ message: e.message, response: e.response?.data || e }, null, 2))
+            } catch (e2) { }
+            return null
         }
     }
 

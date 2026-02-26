@@ -535,41 +535,11 @@ export async function getAccountPaymentStatus(accountId: string): Promise<any> {
     return await service.getAccountDetails()
 }
 
-export async function getAdMonitoringData(accountId: string, anchorDate: string, periodType: string, count: number) {
+export async function getAdMonitoringData(accountId: string, from: string, to: string) {
     const service = await createMetaService(accountId)
     if (!service) return { error: "Conta não conectada" }
 
-    const anchor = parseISO(anchorDate)
-    let startDate = anchor
-
-    // Calculate Start Date
-    // We want 'count' periods ENDING on 'anchorDate'.
-    // Daily: 1 period = 1 day.
-    // Weekly: 1 period = 7 days.
-    // Biweekly: 1 period = 15 days.
-    // Monthly: 1 period = 30 days (approx).
-
-    let daysToSubtract = 0
-
-    if (periodType === 'daily') {
-        daysToSubtract = count - 1
-    } else if (periodType === 'weekly') {
-        daysToSubtract = (count * 7) - 1
-    } else if (periodType === 'biweekly') {
-        daysToSubtract = (count * 15) - 1
-    } else if (periodType === 'monthly') {
-        daysToSubtract = (count * 30) - 1
-    }
-
-    startDate = subDays(anchor, Math.max(0, daysToSubtract))
-
-    const range = {
-        since: format(startDate, 'yyyy-MM-dd'),
-        until: format(anchor, 'yyyy-MM-dd')
-    }
-
-    // console.log(`Monitoring Fetch: ${range.since} to ${range.until} (${periodType} x ${count})`)
-
+    const range = { since: from, until: to }
     const data = await service.getAdDailyInsights(range)
     return { data, range }
 }
@@ -591,6 +561,12 @@ export async function getGlobalMonitoringAction(dateRange: { from: string, to: s
         if (!service) return { id: acc.provider_account_id, name: acc.name, error: "Connection Lost" }
 
         const health = await service.getAccountHealth({ since: dateRange.from, until: dateRange.to })
+        console.log(`\n\n------- HEALTH DEBUG [${acc.name}] -------`)
+        console.log("is_prepay_account:", health?.is_prepay_account)
+        console.log("balance:", health?.balance)
+        console.log("no_balance_count:", health?.no_balance_count)
+        console.log("-------------------------------------------\n\n")
+
         return {
             id: acc.provider_account_id,
             name: acc.name,
@@ -601,4 +577,36 @@ export async function getGlobalMonitoringAction(dateRange: { from: string, to: s
     }))
 
     return healths
+}
+
+export async function getAdPreviewAction(accountId: string, adId: string) {
+    const service = await createMetaService(accountId)
+    if (!service) return { error: "Conta não conectada", html: null, rawVideoUrl: null }
+
+    const html = await service.getAdPreviewHTML(adId)
+
+    // Attempt to extract a direct external Post URL (Instagram or Facebook)
+    let postUrl = null
+    const creative = await service.getAdCreativeDetails(adId)
+
+    if (creative) {
+        // Try to get object_story_id (e.g., "12345_67890" -> pageId_postId)
+        let storyId = creative.effective_object_story_id || creative.object_story_id
+        let instagramActorId = creative.instagram_actor_id
+        let instagramPermalinkId = creative.instagram_permalink_url
+
+        if (instagramPermalinkId) {
+            postUrl = instagramPermalinkId
+        } else if (storyId) {
+            const parts = storyId.split('_')
+            const pageId = parts[0]
+            const postId = parts[1] || parts[0]
+
+            // If we have an instagram actor id, this was likely an insta-only placement, but without permalink we guess the FB post format.
+            // Usually, FB posts are: https://facebook.com/{page_id}/posts/{post_id}
+            postUrl = `https://www.facebook.com/${pageId}/posts/${postId}`
+        }
+    }
+
+    return { html, postUrl }
 }

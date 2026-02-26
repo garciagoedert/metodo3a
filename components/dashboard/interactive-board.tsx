@@ -378,7 +378,7 @@ export function DashboardInteractiveBoard({ insights, daily, distribution, topCr
 
                     {/* 4. Top Creatives */}
                     <div className="mt-2">
-                        <AdCreativeGallery ads={topCreatives} disableLinks={readOnly} />
+                        <AdCreativeGallery ads={topCreatives} disableLinks={readOnly} accountId={accountId} />
                     </div>
                 </div>
 
