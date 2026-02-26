@@ -561,11 +561,6 @@ export async function getGlobalMonitoringAction(dateRange: { from: string, to: s
         if (!service) return { id: acc.provider_account_id, name: acc.name, error: "Connection Lost" }
 
         const health = await service.getAccountHealth({ since: dateRange.from, until: dateRange.to })
-        console.log(`\n\n------- HEALTH DEBUG [${acc.name}] -------`)
-        console.log("is_prepay_account:", health?.is_prepay_account)
-        console.log("balance:", health?.balance)
-        console.log("no_balance_count:", health?.no_balance_count)
-        console.log("-------------------------------------------\n\n")
 
         return {
             id: acc.provider_account_id,
