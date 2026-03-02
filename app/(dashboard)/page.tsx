@@ -39,10 +39,10 @@ export default async function DashboardPage(props: {
 
   // Determine Active Account ID properly
   const activeAccount = accountIdParam
-    ? accounts.find((a: any) => a.provider_account_id === accountIdParam)
+    ? accounts.find((a: any) => a.provider_account_id === accountIdParam || a.id === accountIdParam)
     : accounts[0]
 
-  const activeAccountId = activeAccount?.provider_account_id
+  const activeAccountId = activeAccount?.provider_account_id || activeAccount?.id
 
 
 

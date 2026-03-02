@@ -31,7 +31,7 @@ export function AccountsManager({ accounts }: { accounts: AdAccount[] }) {
 
     const filteredAccounts = accounts.filter(account =>
         account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        account.provider_account_id.includes(searchTerm)
+        (account.provider_account_id || '').includes(searchTerm)
     )
 
     const handleConnect = async (formData: FormData) => {
@@ -124,12 +124,12 @@ export function AccountsManager({ accounts }: { accounts: AdAccount[] }) {
                                 <Input id="name" name="name" required placeholder="Ex: Conta Principal - M3" />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="account_id">ID da Conta de Anúncios (act_...)</Label>
-                                <Input id="account_id" name="account_id" required placeholder="act_1234567890" />
+                                <Label htmlFor="account_id">ID da Conta de Anúncios (Opcional por enquanto)</Label>
+                                <Input id="account_id" name="account_id" placeholder="act_1234567890 (Deixe em branco p/ Pré-Conta)" />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="access_token">Token de Acesso (Long-Lived)</Label>
-                                <Input id="access_token" name="access_token" type="password" required placeholder="EAA..." />
+                                <Input id="access_token" name="access_token" type="password" placeholder="EAA... (Deixe em branco p/ Pré-Conta)" />
                             </div>
                             <DialogFooter>
                                 <Button type="submit" disabled={isLoading} className="bg-[#0668E1] hover:bg-[#0556B9]">
@@ -153,12 +153,12 @@ export function AccountsManager({ accounts }: { accounts: AdAccount[] }) {
                                     </div>
                                     <span className="truncate">{account.name}</span>
                                 </CardTitle>
-                                <Badge variant={account.status === 'active' ? 'default' : 'destructive'} className={account.status === 'active' ? "bg-green-600 hover:bg-green-700" : ""}>
-                                    {account.status === 'active' ? 'Ativo' : 'Erro'}
+                                <Badge variant={account.status === 'active' ? 'default' : (account.status === 'incomplete' ? 'secondary' : 'destructive')} className={account.status === 'active' ? "bg-green-600 hover:bg-green-700" : (account.status === 'incomplete' ? "bg-amber-500 hover:bg-amber-600 text-white" : "")}>
+                                    {account.status === 'active' ? 'Ativo' : (account.status === 'incomplete' ? 'Em Config.' : 'Erro')}
                                 </Badge>
                             </div>
-                            <CardDescription className="text-xs font-mono mt-1 px-1 py-0.5 bg-slate-100 dark:bg-slate-900 w-fit rounded text-slate-500" title={account.provider_account_id}>
-                                ID: {account.provider_account_id}
+                            <CardDescription className="text-xs font-mono mt-1 px-1 py-0.5 bg-slate-100 dark:bg-slate-900 w-fit rounded text-slate-500" title={account.provider_account_id || "Sem ID"}>
+                                {account.provider_account_id ? `ID: ${account.provider_account_id}` : "Pré-conta (Apenas Roteiros)"}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="pb-4">
@@ -208,12 +208,14 @@ export function AccountsManager({ accounts }: { accounts: AdAccount[] }) {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="edit-account_id">ID da Conta (Leitura)</Label>
+                                <Label htmlFor="edit-account_id">ID da Conta {editingAccount.status !== 'incomplete' && "(Leitura)"}</Label>
                                 <Input
+                                    name="account_id"
                                     id="edit-account_id"
-                                    value={editingAccount.provider_account_id}
-                                    disabled
-                                    className="bg-muted"
+                                    defaultValue={editingAccount.provider_account_id || ''}
+                                    disabled={editingAccount.status !== 'incomplete'}
+                                    className={editingAccount.status !== 'incomplete' ? "bg-muted" : ""}
+                                    placeholder={editingAccount.status === 'incomplete' ? "act_1234567890 (Para ativar a conta)" : ""}
                                 />
                             </div>
                             <div className="space-y-2">

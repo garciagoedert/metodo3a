@@ -8,9 +8,9 @@ import { logActivity } from "@/lib/logger"
 export interface AdAccount {
     id: string
     provider: 'meta_ads' | 'google_ads'
-    provider_account_id: string
+    provider_account_id: string | null
     name: string
-    status: 'active' | 'error' | 'expired'
+    status: 'active' | 'error' | 'expired' | 'incomplete'
     last_synced_at: string | null
     created_at: string
 }
@@ -40,20 +40,24 @@ export async function connectMetaAccount(formData: FormData) {
     const accountId = formData.get('account_id') as string
     const accessToken = formData.get('access_token') as string
 
-    if (!name || !accountId || !accessToken) {
-        return { error: "Todos os campos são obrigatórios." }
+    if (!name) {
+        return { error: "O nome da conta é obrigatório." }
     }
 
-    // 1. Validate Token with Meta API (Simple check)
-    try {
-        const response = await fetch(`https://graph.facebook.com/v19.0/me?access_token=${accessToken}`)
-        const data = await response.json()
+    const isComplete = accountId && accessToken
 
-        if (data.error) {
-            return { error: `Erro na validação do Token: ${data.error.message}` }
+    if (isComplete) {
+        // 1. Validate Token with Meta API (Simple check)
+        try {
+            const response = await fetch(`https://graph.facebook.com/v19.0/me?access_token=${accessToken}`)
+            const data = await response.json()
+
+            if (data.error) {
+                return { error: `Erro na validação do Token: ${data.error.message}` }
+            }
+        } catch (err) {
+            return { error: "Falha ao conectar com a API do Facebook." }
         }
-    } catch (err) {
-        return { error: "Falha ao conectar com a API do Facebook." }
     }
 
     // 2. Save to DB
@@ -61,10 +65,10 @@ export async function connectMetaAccount(formData: FormData) {
 
     const { error } = await admin.from('ad_accounts').insert({
         provider: 'meta_ads',
-        provider_account_id: accountId,
+        provider_account_id: accountId || null,
         name: name,
-        access_token: accessToken,
-        status: 'active',
+        access_token: accessToken || null,
+        status: isComplete ? 'active' : 'incomplete',
         user_id: user.id
     })
 
@@ -89,8 +93,9 @@ export async function updateMetaAccount(id: string, formData: FormData) {
 
     const name = formData.get('name') as string
     const accessToken = formData.get('access_token') as string
+    const accountId = formData.get('account_id') as string
 
-    // Note: Provider Account ID is usually constant, avoiding editing it to prevent mismatches
+    // Note: Provider Account ID is usually constant, but we allow adding it to incomplete pre-accounts now.
 
     if (!name) {
         return { error: "Nome é obrigatório." }
@@ -102,7 +107,7 @@ export async function updateMetaAccount(id: string, formData: FormData) {
     }
 
     // Only update and validate token if a new one is provided
-    if (accessToken && accessToken.trim() !== '') {
+    if (accessToken && accessToken.trim() !== '' && accountId && accountId.trim() !== '') {
         // 1. Validate New Token with Meta API
         try {
             const response = await fetch(`https://graph.facebook.com/v19.0/me?access_token=${accessToken}`)
@@ -116,6 +121,7 @@ export async function updateMetaAccount(id: string, formData: FormData) {
         }
 
         updates.access_token = accessToken
+        updates.provider_account_id = accountId
         updates.status = 'active'
     }
 

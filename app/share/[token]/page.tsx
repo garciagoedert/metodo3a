@@ -1,7 +1,7 @@
-import { Suspense } from "react"
 import { getPublicDashboardData } from "@/app/(dashboard)/actions"
 import { DashboardInteractiveBoard } from "@/components/dashboard/interactive-board"
-import { getAccountByToken } from "@/components/dashboard/share-actions"
+import { getAccountByToken, getAllPublicRoteiros, getAccountMonthNotes } from "@/components/dashboard/share-actions"
+import { getTeamMembers } from "@/components/dashboard/comments-actions"
 import { MonthPicker } from "@/components/dashboard/month-picker"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/server"
@@ -11,6 +11,9 @@ import Image from "next/image"
 import { MonthlyAnalysisSection } from "@/components/dashboard/monthly-analysis"
 import { SharePageCopyButton } from "@/components/dashboard/share-page-copy-button"
 import { PaymentStatus } from "@/components/dashboard/payment-status"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import Link from "next/link"
+import { PublicRoteirosView } from "@/components/dashboard/roteiros/public-roteiros-view"
 
 export default async function PublicSharePage(props: {
     params: Promise<{ token: string }>
@@ -19,13 +22,20 @@ export default async function PublicSharePage(props: {
     const params = await props.params
     const searchParams = await props.searchParams
     const token = params.token
+    const currentView = typeof searchParams.view === 'string' ? searchParams.view : 'metrics'
 
     // Identify User
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     const isLoggedIn = !!user
 
-    // Validate Token First
+    // Fetch initial Roteiro Data specifically for the tabs Logic
+    const allRoteiros = await getAllPublicRoteiros(token)
+    const monthNotes = await getAccountMonthNotes(token)
+    const hasRoteiros = allRoteiros.length > 0
+    const teamMembers = isLoggedIn ? await getTeamMembers() : []
+
+    // Validate Token First (Must be done before checking account status)
     const { account, error: accountError } = await getAccountByToken(token)
 
     if (accountError || !account) {
@@ -35,6 +45,18 @@ export default async function PublicSharePage(props: {
                 <p className="text-slate-500">Verifique se o link está correto ou solicite um novo.</p>
             </div>
         )
+    }
+
+    // Setup initial view logic
+    const isPreAccount = (account as any)?.status === 'incomplete'
+
+    // Force 'roteiros' view if account is incomplete.
+    // Force 'metrics' view if 'roteiros' is requested but doesn't exist (and it's a normal account)
+    let actualView = currentView
+    if (isPreAccount) {
+        actualView = 'roteiros'
+    } else if (currentView === 'roteiros' && !hasRoteiros) {
+        actualView = 'metrics'
     }
 
     // Parse Date Range
@@ -68,16 +90,23 @@ export default async function PublicSharePage(props: {
     const monthStart = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}-01`
 
     // Fetch Data (Bypass Auth Check inside getPublicDashboardData, but we know user status here)
-    const data = await getPublicDashboardData(token, dateRange)
+    let data: any = {}
 
-    // Handle Errors
-    if ('error' in data) {
-        return (
-            <div className="flex h-screen w-full items-center justify-center flex-col gap-4">
-                <h1 className="text-xl font-bold text-red-600">Erro ao carregar dados</h1>
-                <p className="text-slate-500">{data.error}</p>
-            </div>
-        )
+    if (!isPreAccount) {
+        data = await getPublicDashboardData(token, dateRange)
+
+        // Handle Errors
+        if ('error' in data) {
+            return (
+                <div className="flex h-screen w-full items-center justify-center flex-col gap-4">
+                    <h1 className="text-xl font-bold text-red-600">Erro ao carregar dados</h1>
+                    <p className="text-slate-500">{data.error}</p>
+                </div>
+            )
+        }
+    } else {
+        // Fallback smooth structure for Pre-Accounts
+        data = { insights: {}, distribution: {}, campaigns: [], funnel: {}, topCreatives: [], dashboardConfig: { hide_metrics: false } }
     }
 
     // Same logic as DashboardPage to prepare props
@@ -134,15 +163,40 @@ export default async function PublicSharePage(props: {
                         </div>
                     </div>
 
-                    {/* Controls */}
-                    <div className="flex flex-row items-center gap-2 w-full md:w-auto bg-white md:bg-transparent p-1 md:p-0 rounded-lg border md:border-none shadow-sm md:shadow-none">
-                        {isLoggedIn && <PaymentStatus accountId={account.provider_account_id} className="w-auto [&_div.flex-col]:hidden md:[&_div.flex-col]:flex" />}
-                        <div className="flex-1 md:flex-none">
-                            <MonthPicker className="w-full md:w-[240px]" />
+                    {/* Navigation Tabs (Centered if available) */}
+                    {(!isPreAccount && hasRoteiros) && (
+                        <div className="flex w-full md:w-auto md:flex-1 justify-start md:justify-center order-last md:order-none overflow-x-auto pb-1 md:pb-0">
+                            <Tabs value={actualView} className="w-auto">
+                                <TabsList>
+                                    <TabsTrigger value="metrics" asChild>
+                                        <Link href={`?view=metrics&from=${dateRange.from}&to=${dateRange.to}`}>
+                                            Métricas de Anúncios
+                                        </Link>
+                                    </TabsTrigger>
+                                    <TabsTrigger value="roteiros" asChild>
+                                        <Link href={`?view=roteiros&from=${dateRange.from}&to=${dateRange.to}`}>
+                                            Roteiros de Gravação
+                                            {(actualView !== 'roteiros') && <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700 hover:bg-blue-100">{allRoteiros.length}</Badge>}
+                                        </Link>
+                                    </TabsTrigger>
+                                </TabsList>
+                            </Tabs>
                         </div>
+                    )}
+
+                    {/* Controls (Right) */}
+                    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto bg-white md:bg-transparent p-1 md:p-0 rounded-lg border md:border-none shadow-sm md:shadow-none">
+
+                        {isLoggedIn && <PaymentStatus accountId={account.provider_account_id} className="w-auto [&_div.flex-col]:hidden lg:[&_div.flex-col]:flex" />}
+
+                        {actualView !== 'roteiros' && (
+                            <div className="flex-1 md:flex-none">
+                                <MonthPicker className="w-full md:w-[240px]" />
+                            </div>
+                        )}
 
                         {isLoggedIn && (
-                            <>
+                            <div className="flex items-center justify-between md:justify-end gap-2">
                                 <SharePageCopyButton />
                                 <div className="hidden md:flex items-center">
                                     <div className="h-4 w-px bg-slate-200 mx-2"></div>
@@ -154,30 +208,44 @@ export default async function PublicSharePage(props: {
                                         </a>
                                     </Button>
                                 </div>
-                            </>
+                            </div>
                         )}
                     </div>
                 </div>
             </header>
 
             <main className="flex flex-1 flex-col gap-6 p-6 max-w-[1600px] mx-auto w-full">
-                <MonthlyAnalysisSection
-                    accountId={account.id}
-                    month={monthStart}
-                    isLoggedIn={isLoggedIn}
-                />
-                <DashboardInteractiveBoard
-                    insights={insights}
-                    daily={daily}
-                    distribution={distribution}
-                    topCreatives={topAds}
-                    manualMetrics={manualMetrics}
-                    funnelData={funnelData}
-                    accountId={account.provider_account_id}
-                    monthStart={monthStart}
-                    dashboardConfig={dashboardConfig}
-                    readOnly={!isLoggedIn} // If logged in, readOnly is false (Editable)
-                />
+                {actualView === 'roteiros' ? (
+                    <PublicRoteirosView
+                        account={account}
+                        isLoggedIn={isLoggedIn}
+                        token={token}
+                        initialRoteiros={allRoteiros}
+                        initialMonthNotes={monthNotes}
+                        teamMembers={teamMembers}
+                        roteirosNotice={account.roteiros_notice}
+                    />
+                ) : (
+                    <>
+                        <MonthlyAnalysisSection
+                            accountId={account.id}
+                            month={monthStart}
+                            isLoggedIn={isLoggedIn}
+                        />
+                        <DashboardInteractiveBoard
+                            insights={insights}
+                            daily={daily}
+                            distribution={distribution}
+                            topCreatives={topAds}
+                            manualMetrics={manualMetrics}
+                            funnelData={funnelData}
+                            accountId={account.provider_account_id}
+                            monthStart={monthStart}
+                            dashboardConfig={dashboardConfig}
+                            readOnly={!isLoggedIn} // If logged in, readOnly is false (Editable)
+                        />
+                    </>
+                )}
             </main>
         </div>
     )

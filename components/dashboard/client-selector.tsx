@@ -22,7 +22,7 @@ import {
 
 interface ClientSelectorProps {
     className?: string
-    accounts: { provider_account_id: string, name: string }[]
+    accounts: { provider_account_id?: string, name: string, id?: string }[]
     currentAccountId?: string
 }
 
@@ -45,7 +45,7 @@ export function ClientSelector({ className, accounts, currentAccountId }: Client
         setOpen(false)
     }
 
-    const currentAccountName = accounts.find(a => a.provider_account_id === currentAccountId)?.name || "Selecione o Cliente..."
+    const currentAccountName = accounts.find(a => a.provider_account_id === currentAccountId || a.id === currentAccountId)?.name || "Selecione o Cliente..."
 
     // Sort accounts alphabetically ignoring "Dr." and "Dra."
     const sortedAccounts = [...accounts].sort((a, b) => {
@@ -79,21 +79,24 @@ export function ClientSelector({ className, accounts, currentAccountId }: Client
                     <CommandList>
                         <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
                         <CommandGroup>
-                            {sortedAccounts.map((account) => (
-                                <CommandItem
-                                    key={account.provider_account_id}
-                                    value={account.name} // Command searches by this value
-                                    onSelect={() => handleSelect(account.provider_account_id)}
-                                >
-                                    <Check
-                                        className={cn(
-                                            "mr-2 h-4 w-4",
-                                            currentAccountId === account.provider_account_id ? "opacity-100" : "opacity-0"
-                                        )}
-                                    />
-                                    {account.name} <span className="ml-auto text-xs text-muted-foreground">({account.provider_account_id})</span>
-                                </CommandItem>
-                            ))}
+                            {sortedAccounts.map((account) => {
+                                const accountIdStr = account.provider_account_id || account.id || ""
+                                return (
+                                    <CommandItem
+                                        key={accountIdStr}
+                                        value={account.name} // Command searches by this value
+                                        onSelect={() => handleSelect(accountIdStr)}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                "mr-2 h-4 w-4",
+                                                (currentAccountId === account.provider_account_id || currentAccountId === account.id) ? "opacity-100" : "opacity-0"
+                                            )}
+                                        />
+                                        {account.name} <span className="ml-auto text-xs text-muted-foreground">({account.provider_account_id || "Pré-Conta"})</span>
+                                    </CommandItem>
+                                )
+                            })}
                         </CommandGroup>
                     </CommandList>
                 </Command>

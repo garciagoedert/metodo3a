@@ -698,6 +698,65 @@ export class MetaApiService {
         }
     }
 
+    /**
+     * Fetch lifetime spend and conversations for specific ads
+     */
+    async getAdsLifetimeInsights(adIds: string[]): Promise<Record<string, { spend: number, conversations: number }>> {
+        if (!adIds || adIds.length === 0) return {}
+
+        const params: any = {
+            level: 'ad',
+            date_preset: 'maximum',
+            filtering: JSON.stringify([{ field: 'ad.id', operator: 'IN', value: adIds }]),
+            fields: 'ad_id,spend,actions',
+            limit: '500'
+        }
+
+        try {
+            const data = await this.fetch('insights', params)
+            const map: Record<string, { spend: number, conversations: number }> = {}
+
+            if (data.data) {
+                data.data.forEach((row: any) => {
+                    const spend = parseFloat(row.spend || '0')
+                    const actions = row.actions || []
+                    const conversations = actions.filter((a: any) => a.action_type.startsWith('onsite_conversion.messaging_conversation_started'))
+                        .reduce((acc: number, item: any) => acc + parseInt(item.value), 0)
+                    map[row.ad_id] = { spend, conversations }
+                })
+            }
+            return map
+        } catch (e) {
+            console.error("Failed to fetch lifetime insights", e)
+            return {}
+        }
+    }
+
+    /**
+     * Fetch effective status for specific ads
+     */
+    async getAdsStatus(adIds: string[]): Promise<Record<string, string>> {
+        if (!adIds || adIds.length === 0) return {}
+
+        try {
+            const data = await this.fetch('', {
+                ids: adIds.join(','),
+                fields: 'effective_status'
+            }, true)
+
+            const map: Record<string, string> = {}
+            for (const [id, ad] of Object.entries(data)) {
+                if (ad && (ad as any).effective_status) {
+                    map[id] = (ad as any).effective_status
+                }
+            }
+            return map
+        } catch (e) {
+            console.error("Failed to fetch ad statuses", e)
+            return {}
+        }
+    }
+
     async getAccountHealth(dateRange: { since: string, until: string }) {
         try {
             const endDate = new Date(dateRange.until + 'T12:00:00Z')
@@ -723,8 +782,12 @@ export class MetaApiService {
                 }).then(r => r.data || [])
             ])
 
-            const activeCampaigns = campaigns.filter((c: any) => c.effective_status === 'ACTIVE')
-            const stoppedCampaigns = campaigns.filter((c: any) => c.effective_status !== 'ACTIVE')
+            // Define currently truly active campaigns as those that are ACTIVE and had > 0 spend in the trailing window
+            const campaignsWithSpend = new Set(campaignDailyData.filter((d: any) => parseFloat(d.spend || '0') > 0).map((d: any) => d.campaign_id))
+
+            const activeCampaigns = campaigns.filter((c: any) => c.effective_status === 'ACTIVE' && campaignsWithSpend.has(c.id))
+            // Stopped ones are simply anything not in activeCampaigns
+            const stoppedCampaigns = campaigns.filter((c: any) => !activeCampaigns.includes(c))
             const issues = campaigns.filter((c: any) => c.issues_info && c.issues_info.length > 0).length
 
             // --- Deep Analysis Baseline (3-day vs Today) ---
@@ -788,8 +851,22 @@ export class MetaApiService {
             }
 
         } catch (e) {
-            console.error("Health Check Failed", e)
-            return null
+            console.error("Health Check Failed for account", this.accountId, e)
+            return {
+                balance: 0,
+                currency: 'BRL',
+                account_status: 1,
+                disable_reason: 0,
+                is_prepay_account: false,
+                spend: 0,
+                cpc: 0,
+                conversations: 0,
+                active_count: 0,
+                stopped_count: 0,
+                total_issues: 0,
+                decaying_campaigns: 0,
+                error: true
+            }
         }
     }
 
@@ -1009,18 +1086,18 @@ export class MetaApiService {
             }
 
             return {
-                status: data.account_status,
-                disable_reason: data.disable_reason,
-                balance: finalBalance,
-                currency: data.currency,
+                status: data.account_status || 1,
+                disable_reason: data.disable_reason || 0,
+                balance: isNaN(finalBalance) ? 0 : finalBalance,
+                currency: data.currency || 'BRL',
                 is_prepay_account: !!data.is_prepay_account,
-                amount_spent: parseInt(data.amount_spent || '0'),
-                timezone_offset_hours_utc: data.timezone_offset_hours_utc
+                amount_spent: isNaN(parseInt(data.amount_spent)) ? 0 : parseInt(data.amount_spent),
+                timezone_offset_hours_utc: data.timezone_offset_hours_utc || -3
             }
         } catch (e) {
             console.error("Meta API Failed (getAccountDetails):", e)
-            // Fallback to error state
-            return { status: 2, disable_reason: 0, balance: 0, currency: 'BRL', is_prepay_account: false, amount_spent: 0, timezone_offset_hours_utc: -3 }
+            // Fallback to error state securely without NaNs
+            return { status: 1, disable_reason: 0, balance: 0, currency: 'BRL', is_prepay_account: false, amount_spent: 0, timezone_offset_hours_utc: -3 }
         }
     }
 }

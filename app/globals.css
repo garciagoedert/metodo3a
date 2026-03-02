@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -123,4 +124,14 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Fix for tiptap-extension-resize-image to prevent infinite horizontal growth */
+.ProseMirror div:has(> img),
+.ProseMirror div:has(> div > img) {
+  max-width: 100% !important;
+}
+
+.ProseMirror img {
+  max-width: 100% !important;
 }

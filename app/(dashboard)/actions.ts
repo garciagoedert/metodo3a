@@ -15,8 +15,8 @@ export async function getConnectedAccounts() {
     const admin = createAdminClient()
     const { data } = await admin
         .from('ad_accounts')
-        .select('provider_account_id, name, id')
-        .eq('status', 'active')
+        .select('provider_account_id, name, id, roteiros_notice')
+        .in('status', ['active', 'incomplete'])
 
     const accounts = data || []
 
@@ -24,7 +24,8 @@ export async function getConnectedAccounts() {
     accounts.push({
         provider_account_id: DEMO_ACCOUNT_ID,
         name: 'Conta Demo Institucional',
-        id: DEMO_DB_ID
+        id: DEMO_DB_ID,
+        roteiros_notice: null
     })
 
     return accounts
@@ -541,7 +542,19 @@ export async function getAdMonitoringData(accountId: string, from: string, to: s
 
     const range = { since: from, until: to }
     const data = await service.getAdDailyInsights(range)
-    return { data, range }
+
+    const uniqueAdIds = Array.from(new Set(data.map(d => d.ad_id)))
+    const lifetimeData = await service.getAdsLifetimeInsights(uniqueAdIds)
+    const adsStatus = await service.getAdsStatus(uniqueAdIds)
+
+    let idealMetrics = {}
+    try {
+        const admin = createAdminClient()
+        const { data: dbAccount } = await admin.from('ad_accounts').select('ideal_metrics').eq('id', service.dbId).single()
+        if (dbAccount?.ideal_metrics) Object.assign(idealMetrics, dbAccount.ideal_metrics)
+    } catch (e) { }
+
+    return { data, range, lifetimeData, idealMetrics, adsStatus }
 }
 
 export async function getMonitoringOverviewAction(accountId: string) {
@@ -554,6 +567,7 @@ export async function getMonitoringOverviewAction(accountId: string) {
 
 export async function getGlobalMonitoringAction(dateRange: { from: string, to: string }) {
     const accounts = await getConnectedAccounts()
+    const admin = createAdminClient()
 
     // Fetch health for all accounts
     const healths = await Promise.all(accounts.map(async (acc) => {
@@ -562,12 +576,22 @@ export async function getGlobalMonitoringAction(dateRange: { from: string, to: s
 
         const health = await service.getAccountHealth({ since: dateRange.from, until: dateRange.to })
 
+        let idealMetrics = {}
+        try {
+            const { data: dbAccount } = await admin.from('ad_accounts').select('ideal_metrics').eq('id', service.dbId).single()
+            if (dbAccount?.ideal_metrics) Object.assign(idealMetrics, dbAccount.ideal_metrics)
+        } catch (e) { }
+
         return {
             id: acc.provider_account_id,
             name: acc.name,
             avatar: null, // Could fetch avatar
             provider_account_id: acc.provider_account_id, // keep ID
-            ...health
+            idealMetrics,
+            ...(health || {
+                balance: 0, currency: 'BRL', account_status: 1, disable_reason: 0, is_prepay_account: false,
+                spend: 0, cpc: 0, conversations: 0, active_count: 0, stopped_count: 0, total_issues: 0, decaying_campaigns: 0
+            })
         }
     }))
 
@@ -604,4 +628,20 @@ export async function getAdPreviewAction(accountId: string, adId: string) {
     }
 
     return { html, postUrl }
+}
+
+export async function saveIdealMetrics(accountId: string, metrics: Record<string, number>) {
+    try {
+        const service = await createMetaService(accountId)
+        if (!service) return { success: false, error: "Conta não conectada" }
+
+        const admin = createAdminClient()
+        const { error } = await admin.from('ad_accounts').update({ ideal_metrics: metrics }).eq('id', service.dbId)
+        if (error) throw error
+
+        return { success: true }
+    } catch (e: any) {
+        console.error(e)
+        return { success: false, error: e.message || "Erro desconhecido" }
+    }
 }

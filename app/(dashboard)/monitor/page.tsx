@@ -27,10 +27,10 @@ export default async function MonitorPage(props: {
 
     // Active account is only relevant for deep_dive, but we can resolve it anyway
     const activeAccount = accountIdParam
-        ? accounts.find((a: any) => a.provider_account_id === accountIdParam)
+        ? accounts.find((a: any) => a.provider_account_id === accountIdParam || a.id === accountIdParam)
         : accounts[0]
 
-    const activeAccountId = activeAccount?.provider_account_id
+    const activeAccountId = activeAccount?.provider_account_id || activeAccount?.id
 
     return (
         <div className="flex flex-1 flex-col w-full">

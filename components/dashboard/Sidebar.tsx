@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
-import { LayoutDashboard, Link as LinkIcon, FileText, Users, Settings, LogOut, ChevronLeft, ChevronRight, User, Activity } from 'lucide-react'
+import { LayoutDashboard, Link as LinkIcon, FileText, Users, Settings, LogOut, ChevronLeft, ChevronRight, User, Activity, Clapperboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -37,6 +37,7 @@ export function Sidebar({ role, user, onLinkClick }: SidebarProps) {
         { name: 'Métricas', href: '/', icon: LayoutDashboard, roles: ['admin', 'cs_manager', 'traffic_manager', 'cs_agent'] },
         { name: 'Monitoramento', href: '/monitor', icon: Activity, roles: ['admin', 'cs_manager', 'traffic_manager', 'cs_agent'] },
         { name: 'Conexões', href: '/admin/accounts', icon: LinkIcon, roles: ['admin', 'cs_manager', 'traffic_manager'] },
+        { name: 'Roteiros', href: '/roteiros', icon: Clapperboard, roles: ['admin', 'cs_manager', 'traffic_manager', 'cs_agent'] },
         { name: 'Histórico', href: '/admin/logs', icon: FileText, roles: ['admin', 'cs_manager', 'traffic_manager', 'cs_agent'] },
         { name: 'Gerenciador', href: '/admin/team', icon: Settings, roles: ['admin'] },
     ]
