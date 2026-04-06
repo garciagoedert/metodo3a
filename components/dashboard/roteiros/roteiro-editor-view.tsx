@@ -47,6 +47,7 @@ export function RoteiroEditorView() {
     const [funnelStage, setFunnelStage] = useState("")
     const [content, setContent] = useState("")
     const [monthYear, setMonthYear] = useState("")
+    const [status, setStatus] = useState<Roteiro['status']>('criacao')
 
     useEffect(() => {
         if (!accountId) {
@@ -66,6 +67,7 @@ export function RoteiroEditorView() {
                     setFunnelStage(data.funnel_stage || "")
                     setContent(data.content || "")
                     setMonthYear(data.month_year || "")
+                    setStatus(data.status || 'criacao')
 
                     const comments = await getRoteiroComments(data.id)
                     if (comments && comments.length > 0) {
@@ -83,7 +85,7 @@ export function RoteiroEditorView() {
         }
     }, [id, accountId, defaultMonth, router])
 
-    const handleSave = async (sendForApproval: boolean, explicitStatus?: 'criacao' | 'aprovacao' | 'aprovado') => {
+    const handleSave = async (sendForApproval: boolean, explicitStatus?: Roteiro['status']) => {
         if (!accountId) return
         if (!title || !focus || !funnelStage || !monthYear) {
             toast.error("Preencha todos os campos obrigatórios.")
@@ -100,7 +102,7 @@ export function RoteiroEditorView() {
             funnel_stage: funnelStage,
             content,
             month_year: monthYear,
-            status: explicitStatus ? explicitStatus : (sendForApproval ? 'aprovacao' : (roteiro?.status || 'criacao'))
+            status: explicitStatus ? explicitStatus : status
         }
 
         const res = await saveRoteiro(accountId, payload)
@@ -109,7 +111,7 @@ export function RoteiroEditorView() {
         if (res.error) {
             toast.error("Erro ao salvar: " + res.error, { id: toastId })
         } else {
-            toast.success(explicitStatus === 'criacao' && roteiro?.status === 'aprovacao' ? "Roteiro retirado da aprovação!" : (sendForApproval ? "Enviado para Aprovação!" : "Roteiro salvo com sucesso!"), { id: toastId })
+            toast.success("Roteiro salvo com sucesso!", { id: toastId })
             router.push(accountId ? `/roteiros?account=${accountId}` : '/roteiros') // Voltar para a página de roteiros com o filtro da conta
         }
     }
@@ -169,19 +171,19 @@ export function RoteiroEditorView() {
                         {roteiro?.id ? "Salvar Alteração" : "Salvar Rascunho"}
                     </Button>
                     <Button
-                        className={roteiro?.status === 'aprovacao'
+                        className={(status === 'liberado' || status === 'em_gravacao')
                             ? "bg-amber-500 hover:bg-amber-600 text-white flex-1 md:flex-none"
                             : "bg-blue-600 hover:bg-blue-700 text-white flex-1 md:flex-none"}
                         onClick={() => {
-                            if (roteiro?.status === 'aprovacao') {
-                                handleSave(false, 'criacao') // Revert to criacao
+                            if (status === 'liberado' || status === 'em_gravacao') {
+                                handleSave(false, 'criacao') 
                             } else {
-                                handleSave(true) // Send to aprovacao
+                                handleSave(false, 'liberado')
                             }
                         }}
-                        disabled={isSaving || isDeleting || roteiro?.status === 'aprovado'}
+                        disabled={isSaving || isDeleting}
                     >
-                        {roteiro?.status === 'aprovacao' ? "Retirar da Aprovação" : "Enviar para Aprovação"}
+                        {(status === 'liberado' || status === 'em_gravacao') ? "Remover da Área do Cliente" : "Enviar p/ Área do Cliente"}
                     </Button>
                 </div>
             </div>
@@ -248,11 +250,18 @@ export function RoteiroEditorView() {
 
                                 <div className="space-y-2">
                                     <Label className="text-xs text-slate-500 font-semibold uppercase">Status Atual</Label>
-                                    <div className="h-10 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 px-3 rounded-md flex items-center shadow-sm">
-                                        <span className="text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider bg-white dark:bg-slate-950 border text-slate-600 dark:text-slate-300 shadow-sm">
-                                            {roteiro?.status === 'aprovado' ? 'Aprovado' : roteiro?.status === 'aprovacao' ? 'Em Aprovação' : 'Criação'}
-                                        </span>
-                                    </div>
+                                    <Select value={status} onValueChange={(v: Roteiro['status']) => setStatus(v)}>
+                                        <SelectTrigger className="bg-slate-50 dark:bg-slate-900 border-slate-200 font-bold text-xs uppercase tracking-wider h-10 shadow-sm">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="criacao">Em Criação</SelectItem>
+                                            <SelectItem value="liberado">Área do Cliente</SelectItem>
+                                            <SelectItem value="em_gravacao">Em Gravação</SelectItem>
+                                            <SelectItem value="gravado">Gravado</SelectItem>
+                                            <SelectItem value="postado">Postado</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                         </div>

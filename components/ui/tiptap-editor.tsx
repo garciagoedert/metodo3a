@@ -101,28 +101,39 @@ export function TiptapEditor({ value, onChange, editable = true }: TiptapEditorP
                 const items = event.clipboardData?.items;
                 if (!items) return false;
 
-                let hasImage = false;
+                // Check if clipboard contains text or html
+                let hasText = false;
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('text') !== -1) {
+                        hasText = true;
+                    }
+                }
+
                 for (let i = 0; i < items.length; i++) {
                     const item = items[i];
                     if (item.type.indexOf('image') !== -1) {
-                        hasImage = true;
-                        const file = item.getAsFile();
-                        if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (e) => {
-                                const result = e.target?.result as string;
-                                if (result) {
-                                    const { schema } = view.state;
-                                    const node = schema.nodes.image.create({ src: result, width: 400 });
-                                    const transaction = view.state.tr.replaceSelectionWith(node);
-                                    view.dispatch(transaction);
-                                }
-                            };
-                            reader.readAsDataURL(file);
+                        // If there is Text/HTML, Tiptap's native paste handler is better equipped 
+                        // to handle the structured formatting. We only manually force-insert pure image files.
+                        if (!hasText) {
+                            const file = item.getAsFile();
+                            if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (e) => {
+                                    const result = e.target?.result as string;
+                                    if (result) {
+                                        const { schema } = view.state;
+                                        const node = schema.nodes.image.create({ src: result, width: 400 });
+                                        const transaction = view.state.tr.replaceSelectionWith(node);
+                                        view.dispatch(transaction);
+                                    }
+                                };
+                                reader.readAsDataURL(file);
+                            }
+                            return true; // Stop Tiptap native handling since we handled the raw image
                         }
                     }
                 }
-                return hasImage;
+                return false; // Let Tiptap handle text and HTML natively
             }
         },
         onUpdate: ({ editor }) => {
@@ -139,10 +150,9 @@ export function TiptapEditor({ value, onChange, editable = true }: TiptapEditorP
     const linkInputRef = useRef<HTMLInputElement>(null)
     const imageInputRef = useRef<HTMLInputElement>(null)
 
+    // Intentionally empty or remove the dead useEffect
     useEffect(() => {
-        if (editor && value !== editor.getHTML()) {
-            if (editor.getText() === "" && value === "") return
-        }
+        // Tiptap controls its own internal state, parent syncs via onUpdate
     }, [value, editor])
 
     if (!editor) return null
@@ -389,7 +399,16 @@ export function TiptapEditor({ value, onChange, editable = true }: TiptapEditorP
             </div>
 
             {/* Editor Area */}
-            <div className="flex-1 bg-white cursor-text" onClick={() => editor.commands.focus()}>
+            <div 
+                className="flex-1 bg-white cursor-text" 
+                onClick={(e) => {
+                    // Only force focus if the user clicked the empty wrapper 
+                    // (not the text content itself) to preserve text selections
+                    if (e.target === e.currentTarget && editor) {
+                        editor.commands.focus('end')
+                    }
+                }}
+            >
                 {editor && (
                     <BubbleMenu
                         editor={editor}

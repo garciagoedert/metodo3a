@@ -51,9 +51,9 @@ export function PublicRoteirosView({ account, isLoggedIn, token, initialRoteiros
     }, [availableMonths, viewMode])
 
     const groupedRoteiros = displayMonths.reduce((acc, month) => {
-        const filtered = roteiros.filter(r => r.month_year === month)
-        const statusRank = { criacao: 0, aprovacao: 1, aprovado: 2 }
-        acc[month] = filtered.sort((a, b) => statusRank[a.status] - statusRank[b.status])
+        const filtered = roteiros.filter(r => r.month_year === month && r.status !== 'criacao')
+        // Sort inside each group strictly by created_at (descending) to match the admin DND order
+        acc[month] = filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         return acc
     }, {} as Record<string, Roteiro[]>)
 
@@ -113,13 +113,18 @@ export function PublicRoteirosView({ account, isLoggedIn, token, initialRoteiros
     }
 
     const getStatusInfo = (status: Roteiro['status']) => {
-        if (status === 'aprovacao') return {
-            label: 'Aguardando sua Aprovação',
-            color: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800',
-            icon: <Clock className="w-3.5 h-3.5" />
+        if (status === 'liberado' || status === 'em_gravacao' || status === 'criacao') return {
+            label: '',
+            color: '',
+            icon: null
         }
-        if (status === 'aprovado') return {
-            label: 'Aprovado',
+        if (status === 'gravado') return {
+            label: 'Gravado',
+            color: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800',
+            icon: <CheckCircle2 className="w-3.5 h-3.5" />
+        }
+        if (status === 'postado') return {
+            label: 'Postado',
             color: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800',
             icon: <CheckCircle2 className="w-3.5 h-3.5" />
         }
@@ -227,10 +232,12 @@ export function PublicRoteirosView({ account, isLoggedIn, token, initialRoteiros
                                                         <h4 className="font-bold text-[14px] text-slate-800 dark:text-slate-100 leading-tight">
                                                             {item.title || "Sem Título"}
                                                         </h4>
-                                                        <span className={cn("flex shrink-0 items-center gap-1.5 text-[10px] px-2 py-1 rounded-md border font-bold tracking-wide", statusInfo.color)}>
-                                                            {statusInfo.icon}
-                                                            {statusInfo.label}
-                                                        </span>
+                                                        {statusInfo.label && (
+                                                            <span className={cn("flex shrink-0 items-center gap-1.5 text-[10px] px-2 py-1 rounded-md border font-bold tracking-wide", statusInfo.color)}>
+                                                                {statusInfo.icon}
+                                                                {statusInfo.label}
+                                                            </span>
+                                                        )}
                                                     </div>
 
                                                     {item.funnel_stage && (

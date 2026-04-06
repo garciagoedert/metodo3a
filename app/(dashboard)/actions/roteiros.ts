@@ -36,7 +36,7 @@ export type Roteiro = {
     title: string
     focus: string
     funnel_stage: string
-    status: 'criacao' | 'aprovacao' | 'aprovado'
+    status: 'criacao' | 'liberado' | 'em_gravacao' | 'gravado' | 'postado'
     content: string
     created_at: string
     updated_at: string
@@ -136,6 +136,29 @@ export async function saveRoteiro(providerAccountId: string, payload: Partial<Ro
 
     revalidatePath('/roteiros')
     return { success: true, id: newId }
+}
+
+export async function reorderRoteiro(id: string, newCreatedAt: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: "Unauthorized" }
+
+    const admin = createAdminClient()
+
+    const { error } = await admin
+        .from('roteiros')
+        .update({
+            created_at: newCreatedAt
+        })
+        .eq('id', id)
+
+    if (error) {
+        console.error("Reorder Roteiro Error:", error)
+        return { error: error.message }
+    }
+
+    revalidatePath('/roteiros')
+    return { success: true }
 }
 
 export async function moveRoteiro(id: string, newMonthYear: string) {

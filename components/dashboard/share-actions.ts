@@ -127,7 +127,7 @@ export async function getAllPublicRoteiros(token: string) {
     return data as any[]
 }
 
-export async function submitRoteiroApproval(token: string, roteiroId: string, action: 'approve' | 'request_changes', comment?: string) {
+export async function updatePublicRoteiroStatus(token: string, roteiroId: string, newStatus: 'liberado' | 'em_gravacao' | 'gravado' | 'postado', comment?: string) {
     if (!token || !roteiroId) return { error: "Invalid request" }
 
     const admin = createAdminClient()
@@ -151,8 +151,6 @@ export async function submitRoteiroApproval(token: string, roteiroId: string, ac
     if (roteiroError || !roteiro) return { error: "Roteiro not found or access denied" }
 
     // 2. Perform the action
-    const newStatus = action === 'approve' ? 'aprovado' : 'criacao' // If change requested, it goes back to creation phase
-
     const { error: updateError } = await admin
         .from('roteiros')
         .update({ status: newStatus })

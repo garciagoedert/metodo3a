@@ -185,32 +185,34 @@ export default async function PublicSharePage(props: {
                     )}
 
                     {/* Controls (Right) */}
-                    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto bg-white md:bg-transparent p-1 md:p-0 rounded-lg border md:border-none shadow-sm md:shadow-none">
+                    {(isLoggedIn || actualView !== 'roteiros') && (
+                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto bg-white md:bg-transparent p-1 md:p-0 rounded-lg border md:border-none shadow-sm md:shadow-none">
 
-                        {isLoggedIn && <PaymentStatus accountId={account.provider_account_id} className="w-auto [&_div.flex-col]:hidden lg:[&_div.flex-col]:flex" />}
+                            {isLoggedIn && <PaymentStatus accountId={account.provider_account_id} className="w-auto [&_div.flex-col]:hidden lg:[&_div.flex-col]:flex" />}
 
-                        {actualView !== 'roteiros' && (
-                            <div className="flex-1 md:flex-none">
-                                <MonthPicker className="w-full md:w-[240px]" />
-                            </div>
-                        )}
-
-                        {isLoggedIn && (
-                            <div className="flex items-center justify-between md:justify-end gap-2">
-                                <SharePageCopyButton />
-                                <div className="hidden md:flex items-center">
-                                    <div className="h-4 w-px bg-slate-200 mx-2"></div>
-                                    <Badge variant="outline" className="mr-2 text-blue-600 bg-blue-50 border-blue-200">Modo Admin</Badge>
-                                    <Button variant="ghost" size="sm" asChild>
-                                        <a href="/" className="flex items-center gap-2 text-slate-600 hover:text-blue-600">
-                                            <LayoutDashboard className="h-4 w-4" />
-                                            <span>Voltar</span>
-                                        </a>
-                                    </Button>
+                            {actualView !== 'roteiros' && (
+                                <div className="flex-1 md:flex-none">
+                                    <MonthPicker className="w-full md:w-[240px]" />
                                 </div>
-                            </div>
-                        )}
-                    </div>
+                            )}
+
+                            {isLoggedIn && (
+                                <div className="flex items-center justify-between md:justify-end gap-2">
+                                    <SharePageCopyButton />
+                                    <div className="hidden md:flex items-center">
+                                        <div className="h-4 w-px bg-slate-200 mx-2"></div>
+                                        <Badge variant="outline" className="mr-2 text-blue-600 bg-blue-50 border-blue-200">Modo Admin</Badge>
+                                        <Button variant="ghost" size="sm" asChild>
+                                            <a href="/" className="flex items-center gap-2 text-slate-600 hover:text-blue-600">
+                                                <LayoutDashboard className="h-4 w-4" />
+                                                <span>Voltar</span>
+                                            </a>
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </header>
 

@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useMemo } from "react"
+import Link from "next/link"
 import { getRoteiros, moveRoteiro, type Roteiro } from "@/app/(dashboard)/actions/roteiros"
 import { addMonths, format, parse, subMonths } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -122,25 +123,74 @@ export function RoteirosView({ accountId }: { accountId: string }) {
             }
         })
 
-        // Sort inside each group: criacao -> aprovacao -> aprovado
-        const statusRank = { criacao: 0, aprovacao: 1, aprovado: 2 };
+        // Sort inside each group strictly by created_at (descending)
         Object.keys(groups).forEach(key => {
-            groups[key].sort((a, b) => statusRank[a.status] - statusRank[b.status])
+            groups[key].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         })
 
         return groups
     }, [roteiros, activeMonths])
 
-    // Drag Actions
     const onDragEnd = (result: DropResult) => {
         const { source, destination, draggableId } = result
         if (!destination) return
-        if (source.droppableId === destination.droppableId) return // same month, we don't handle sorting rank right now 
 
-        const destMonth = destination.droppableId
         const sourceMonth = source.droppableId
+        const destMonth = destination.droppableId
+
+        if (sourceMonth === destMonth && source.index === destination.index) return
+
+        if (sourceMonth === destMonth) {
+            handleReorder(sourceMonth, source.index, destination.index, draggableId)
+            return
+        }
 
         setConfirmMove({ id: draggableId, sourceMonth, destMonth })
+    }
+
+    const handleReorder = async (monthStr: string, sourceIdx: number, destIdx: number, draggableId: string) => {
+        // Optimistic UI update
+        const originalRoteiros = [...roteiros]
+        const groupElements = [...(groupedRoteiros[monthStr] || [])]
+        
+        const [movedItem] = groupElements.splice(sourceIdx, 1)
+        groupElements.splice(destIdx, 0, movedItem)
+
+        // Find created_at values of siblings in the new position
+        const prevItem = groupElements[destIdx - 1]
+        const nextItem = groupElements[destIdx + 1]
+
+        let newTime: number
+
+        if (!prevItem && !nextItem) {
+            return
+        } else if (!prevItem) {
+            // Moved to the top -> make it strictly LARGER than the current top item
+            newTime = new Date(nextItem.created_at).getTime() + 60000 
+        } else if (!nextItem) {
+            // Moved to the bottom -> make it strictly SMALLER than the current bottom item
+            newTime = new Date(prevItem.created_at).getTime() - 60000 
+        } else {
+            // Mid drop point
+            const t1 = new Date(prevItem.created_at).getTime()
+            const t2 = new Date(nextItem.created_at).getTime()
+            newTime = t1 - ((t1 - t2) / 2)
+        }
+
+        const newCreatedAt = new Date(newTime).toISOString()
+
+        setRoteiros(prev => prev.map(r => r.id === draggableId ? { ...r, created_at: newCreatedAt } : r))
+
+        import('@/app/(dashboard)/actions/roteiros').then(async ({ reorderRoteiro }) => {
+            const res = await reorderRoteiro(draggableId, newCreatedAt)
+            if (res.error) {
+                toast.error("Erro ao reordenar.")
+                setRoteiros(originalRoteiros)
+            }
+        }).catch(() => {
+            toast.error("Erro inesperado e interno.")
+            setRoteiros(originalRoteiros)
+        })
     }
 
     const confirmDrag = async () => {
@@ -167,16 +217,20 @@ export function RoteirosView({ accountId }: { accountId: string }) {
     const cancelDrag = () => setConfirmMove(null)
 
     const getStatusLabel = (status: Roteiro['status']) => {
-        if (status === 'criacao') return 'CRIAÇÃO'
-        if (status === 'aprovacao') return 'EM APROVAÇÃO'
-        if (status === 'aprovado') return 'APROVADO'
+        if (status === 'criacao') return 'EM CRIAÇÃO'
+        if (status === 'liberado') return 'ÁREA DO CLIENTE'
+        if (status === 'em_gravacao') return 'EM GRAVAÇÃO'
+        if (status === 'gravado') return 'GRAVADO'
+        if (status === 'postado') return 'POSTADO'
         return String(status).toUpperCase()
     }
 
     const getBadgeStyles = (status: Roteiro['status']) => {
-        if (status === 'criacao') return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800"
-        if (status === 'aprovacao') return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800"
-        if (status === 'aprovado') return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800"
+        if (status === 'criacao') return "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300"
+        if (status === 'liberado') return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800"
+        if (status === 'em_gravacao') return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800"
+        if (status === 'gravado') return "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800"
+        if (status === 'postado') return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800"
         return "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300"
     }
 
@@ -285,33 +339,33 @@ export function RoteirosView({ accountId }: { accountId: string }) {
                                                                 ref={provided.innerRef}
                                                                 {...provided.draggableProps}
                                                                 className={cn(
-                                                                    "group flex flex-col p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-950 cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 transition-all hover:shadow-md",
+                                                                    "group flex items-stretch rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-950 transition-all hover:shadow-md",
                                                                     snapshot.isDragging && "shadow-xl border-blue-400 dark:border-blue-600 scale-[1.03] z-50 opacity-95 ring-2 ring-blue-500/20"
                                                                 )}
-                                                                onClick={() => {
-                                                                    router.push(`/roteiros/editor?accountId=${accountId}&id=${item.id}&month=${item.month_year}`)
-                                                                }}
                                                             >
-                                                                <div className="flex items-start gap-3">
-                                                                    <div {...provided.dragHandleProps} className="mt-0.5 text-slate-300 hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400 cursor-grab active:cursor-grabbing transition-colors">
-                                                                        <GripVertical className="w-4 h-4" />
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0 flex flex-col gap-2">
-                                                                        <h4 className="font-bold text-[14px] text-slate-800 dark:text-slate-100 leading-tight line-clamp-2" title={item.title || "Sem Título"}>
-                                                                            {item.title || "Sem Título"}
-                                                                        </h4>
-                                                                        <div className="flex flex-wrap items-center gap-2 mt-auto pt-1">
+                                                                <div {...provided.dragHandleProps} className="flex flex-col justify-center px-4 py-4 text-slate-300 hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400 cursor-grab active:cursor-grabbing transition-colors bg-slate-50/80 border-r border-slate-100/50 rounded-l-xl dark:bg-slate-900/50 dark:border-slate-800/80">
+                                                                    <GripVertical className="w-5 h-5 mx-auto" />
+                                                                </div>
+                                                                <Link 
+                                                                    href={`/roteiros/editor?accountId=${accountId}&id=${item.id}&month=${item.month_year}`}
+                                                                    className="flex-1 min-w-0 flex flex-col gap-2 p-4 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 rounded-r-xl transition-colors cursor-pointer outline-none"
+                                                                >
+                                                                    <h4 className="font-bold text-[14px] text-slate-800 dark:text-slate-100 leading-tight line-clamp-2" title={item.title || "Sem Título"}>
+                                                                        {item.title || "Sem Título"}
+                                                                    </h4>
+                                                                    <div className="flex flex-wrap items-center gap-2 mt-auto pt-1">
+                                                                        {(item.status === 'gravado' || item.status === 'postado' || item.status === 'liberado') && (
                                                                             <span className={cn("text-[10px] px-2 py-0.5 rounded-md border font-bold tracking-wide", getBadgeStyles(item.status))}>
                                                                                 {getStatusLabel(item.status)}
                                                                             </span>
-                                                                            {item.funnel_stage && (
-                                                                                <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded-md px-2 py-0.5 whitespace-nowrap bg-slate-50 dark:bg-slate-900 flex items-center gap-1.5">
-                                                                                    <Filter className="w-3 h-3 text-slate-400" /> {item.funnel_stage}
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
+                                                                        )}
+                                                                        {item.funnel_stage && (
+                                                                            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded-md px-2 py-0.5 whitespace-nowrap bg-slate-50 dark:bg-slate-900 flex items-center gap-1.5">
+                                                                                <Filter className="w-3 h-3 text-slate-400" /> {item.funnel_stage}
+                                                                            </span>
+                                                                        )}
                                                                     </div>
-                                                                </div>
+                                                                </Link>
                                                             </div>
                                                         )}
                                                     </Draggable>
