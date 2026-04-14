@@ -36,6 +36,7 @@ const CustomImage = ImageResize.extend({
 })
 import { TextAlign } from '@tiptap/extension-text-align'
 import { FontSize } from './tiptap-font-size'
+import { cn } from "@/lib/utils"
 
 import { Toggle } from "@/components/ui/toggle"
 import { Button } from "@/components/ui/button"
@@ -58,9 +59,10 @@ interface TiptapEditorProps {
     value: string
     onChange: (html: string) => void
     editable?: boolean
+    className?: string
 }
 
-export function TiptapEditor({ value, onChange, editable = true }: TiptapEditorProps) {
+export function TiptapEditor({ value, onChange, editable = true, className }: TiptapEditorProps) {
     const editor = useEditor({
         extensions: [
             StarterKit.configure({
@@ -95,7 +97,7 @@ export function TiptapEditor({ value, onChange, editable = true }: TiptapEditorP
         immediatelyRender: false,
         editorProps: {
             attributes: {
-                class: 'min-h-[300px] w-full bg-white px-6 py-4 text-base outline-none prose prose-slate max-w-none focus:ring-0 leading-snug prose-p:my-0 pb-12 prose-headings:my-1 prose-ul:my-0 prose-ol:my-0',
+                class: 'min-h-[300px] w-full max-w-full bg-white px-6 py-4 text-base outline-none prose prose-slate focus:ring-0 leading-snug prose-p:my-0 pb-12 prose-headings:my-1 prose-ul:my-0 prose-ol:my-0 break-words [word-break:break-word] whitespace-pre-wrap',
             },
             handlePaste: (view, event, slice) => {
                 const items = event.clipboardData?.items;
@@ -186,7 +188,7 @@ export function TiptapEditor({ value, onChange, editable = true }: TiptapEditorP
     }
 
     return (
-        <div className="border rounded-xl border-slate-200 bg-white shadow-sm flex flex-col overflow-hidden transition-all focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100">
+        <div className={cn("border rounded-xl border-slate-200 bg-white shadow-sm flex flex-col overflow-hidden transition-all focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100", className)}>
             {/* Toolbar Top Row */}
             <div className="border-b border-slate-100 bg-slate-50/80 p-2 flex gap-1 flex-wrap items-center relative z-10 w-full">
 
@@ -400,7 +402,7 @@ export function TiptapEditor({ value, onChange, editable = true }: TiptapEditorP
 
             {/* Editor Area */}
             <div 
-                className="flex-1 bg-white cursor-text" 
+                className="flex-1 w-full bg-white cursor-text overflow-y-auto overflow-x-hidden" 
                 onClick={(e) => {
                     // Only force focus if the user clicked the empty wrapper 
                     // (not the text content itself) to preserve text selections

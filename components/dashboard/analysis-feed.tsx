@@ -167,7 +167,7 @@ export function AnalysisFeed({ accountId, month, isLoggedIn }: AnalysisFeedProps
                                 Adicionar Nota
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[700px]">
+                        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
                             <DialogHeader>
                                 <DialogTitle>{editingId ? "Editar Análise" : "Adicionar Análise"}</DialogTitle>
                                 <DialogDescription>
@@ -208,6 +208,7 @@ export function AnalysisFeed({ accountId, month, isLoggedIn }: AnalysisFeedProps
                                 <TiptapEditor
                                     value={newComment}
                                     onChange={setNewComment}
+                                    className="max-h-[50vh]"
                                 />
 
                                 <div className="flex justify-end gap-2">

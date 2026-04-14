@@ -190,7 +190,7 @@ export function RoteiroCommentsArea({ roteiroId, isPublic = false, token = "" }:
 
                             <Textarea
                                 placeholder="Escreva uma observação..."
-                                className="min-h-[80px] text-sm resize-none"
+                                className="min-h-[80px] max-h-[300px] overflow-y-auto text-sm resize-none"
                                 value={newComment}
                                 onChange={(e) => setNewComment(e.target.value)}
                             />

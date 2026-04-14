@@ -43,6 +43,7 @@ export function RoteirosView({ accountId }: { accountId: string }) {
 
     // Custom controls
     const [columnOffsets, setColumnOffsets] = useState<number[]>([])
+    const [isHydrated, setIsHydrated] = useState(false)
 
     // Month Note states
     const [monthNotes, setMonthNotes] = useState<any[]>([])
@@ -52,11 +53,47 @@ export function RoteirosView({ accountId }: { accountId: string }) {
     // Confirmation Modal State
     const [confirmMove, setConfirmMove] = useState<{ id: string, sourceMonth: string, destMonth: string } | null>(null)
 
-    // Calculate Active Columns (Months)
+    // Load from localStorage on mount
     useEffect(() => {
-        // Reset offsets when view changes to match the view cols
-        setColumnOffsets(Array(VIEW_COLS[viewMode]).fill(0).map((_, i) => i))
-    }, [viewMode, baseDate])
+        if (!accountId) return;
+        const savedMode = localStorage.getItem(`m3a_roteiros_mode_${accountId}`) as ViewMode
+        const savedOffsets = localStorage.getItem(`m3a_roteiros_offsets_${accountId}`)
+        
+        let initialMode: ViewMode = 'bimensal'
+        let initialOffsets: number[] | null = null
+
+        if (savedMode && VIEW_COLS[savedMode]) {
+            initialMode = savedMode
+        }
+        
+        if (savedOffsets) {
+            try {
+                initialOffsets = JSON.parse(savedOffsets)
+            } catch (e) {}
+        }
+        
+        setViewMode(initialMode)
+        
+        if (initialOffsets && Array.isArray(initialOffsets) && initialOffsets.length === VIEW_COLS[initialMode]) {
+            setColumnOffsets(initialOffsets)
+        } else {
+            setColumnOffsets(Array(VIEW_COLS[initialMode]).fill(0).map((_, i) => i))
+        }
+        
+        setIsHydrated(true)
+    }, [accountId])
+
+    // Save to localStorage when changed
+    useEffect(() => {
+        if (!isHydrated || !accountId) return
+        localStorage.setItem(`m3a_roteiros_mode_${accountId}`, viewMode)
+        localStorage.setItem(`m3a_roteiros_offsets_${accountId}`, JSON.stringify(columnOffsets))
+    }, [viewMode, columnOffsets, isHydrated, accountId])
+
+    const handleViewModeChange = (mode: ViewMode) => {
+        setViewMode(mode)
+        setColumnOffsets(Array(VIEW_COLS[mode]).fill(0).map((_, i) => i))
+    }
 
     const activeMonths = useMemo(() => {
         return columnOffsets.map(offset => {
@@ -243,12 +280,16 @@ export function RoteirosView({ accountId }: { accountId: string }) {
         })
     }
 
+    if (!isHydrated) {
+        return null; // Prevents hydration mismatch and flashes
+    }
+
     return (
         <div className="flex flex-col gap-6">
             {/* Toolbar */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-slate-950 p-4 rounded-xl shadow-sm border">
                 <div className="flex items-center gap-2">
-                    <Select value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+                    <Select value={viewMode} onValueChange={(v) => handleViewModeChange(v as ViewMode)}>
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="Visualização" />
                         </SelectTrigger>

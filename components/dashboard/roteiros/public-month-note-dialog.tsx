@@ -116,7 +116,7 @@ export function PublicMonthNoteDialog({ monthStr, initialContent, initialAuthorI
                                     value={content}
                                     onChange={e => setContent(e.target.value)}
                                     placeholder="Ex: O foco deste mês será na conversão de consultas finais de ano..."
-                                    className="min-h-[250px] resize-none text-base leading-relaxed p-4"
+                                    className="min-h-[250px] max-h-[60vh] overflow-y-auto resize-none text-base leading-relaxed p-4"
                                     disabled={isSubmitting}
                                 />
                             </div>
